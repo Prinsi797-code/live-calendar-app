@@ -24,6 +24,7 @@ import {
 } from 'react-native-google-mobile-ads';
 import { CustomToast } from '../components/CustomToast';
 import { useTheme } from '../contexts/ThemeContext';
+import { useScreenTracking } from '../hooks/useScreenTracking';
 import AdsManager from '../services/adsManager';
 import NotificationService from '../services/NotificationService';
 import PurchaseManager from '../services/purchaseManager';
@@ -44,6 +45,7 @@ export default function EditEventScreen() {
     // Add state for repeat modal
     const [showRepeatModal, setShowRepeatModal] = useState(false);
     const [tempRepeatValue, setTempRepeatValue] = useState('does_not');
+    useScreenTracking('edit_event_screen');
 
     // Repeat options
     const getRepeatOptions = () => {

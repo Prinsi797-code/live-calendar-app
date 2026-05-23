@@ -19,9 +19,10 @@ import {
   GAMBannerAd
 } from 'react-native-google-mobile-ads';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useScreenTracking } from '../../hooks/useScreenTracking';
 import AdsManager from '../../services/adsManager';
 import NotificationService from '../../services/NotificationService';
-import PurchaseManager from '../../services/purchaseManager'; // ✅ ADD
+import PurchaseManager from '../../services/purchaseManager';
 
 interface Challenge {
   id: string;
@@ -43,6 +44,7 @@ export default function ChallengeDetailsScreen() {
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [is24Hour, setIs24Hour] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  useScreenTracking('challenge_details_screen');
   const [bannerConfig, setBannerConfig] = useState<{
     show: boolean;
     id: string;
@@ -113,46 +115,6 @@ export default function ChallengeDetailsScreen() {
     }, [params.id])
   );
 
-  // const handleDelete = () => {
-  //   Alert.alert(
-  //     t('delete_challenge_title'),
-  //     t('delete_challenge_message'),
-  //     [
-  //       {
-  //         text: t('cancel'),
-  //         style: 'cancel',
-  //       },
-  //       {
-  //         text: t('delete'),
-  //         style: 'destructive',
-  //         onPress: async () => {
-  //           try {
-  //             const challengesData = await AsyncStorage.getItem('challenges');
-  //             if (challengesData) {
-  //               const challenges = JSON.parse(challengesData);
-  //               const updatedChallenges = challenges.filter(
-  //                 (c: Challenge) => c.id !== params.id
-  //               );
-  //               await AsyncStorage.setItem(
-  //                 'challenges',
-  //                 JSON.stringify(updatedChallenges)
-  //               );
-  //               // router.back();
-  //               if (searchParams?.from === '/challengeDetails') {
-  //                 router.replace('/challenge');
-  //               } else {
-  //                 router.replace('/challenge');
-  //               }
-  //             }
-  //           } catch (error) {
-  //             console.error('Error deleting challenge:', error);
-  //             Alert.alert('Error', 'Failed to delete challenge');
-  //           }
-  //         },
-  //       },
-  //     ]
-  //   );
-  // };
   const handleDelete = () => {
     Alert.alert(
       t('delete_challenge_title'),
@@ -209,14 +171,6 @@ export default function ChallengeDetailsScreen() {
     );
   };
 
-  // const handleBackPress = async () => {
-  //   if (searchParams?.from === "/challengeDetails") {
-  //     router.replace("/challenge");
-  //   } else {
-  //     router.replace("/challenge");
-  //   }
-  // };
-
   const handleBackPress = async () => {
     try {
       const isPremium = await PurchaseManager.isPremium();
@@ -227,11 +181,14 @@ export default function ChallengeDetailsScreen() {
         return;
       }
 
-      console.log('Challenge detail back pressed, attempting to show ad...');
-      const adShown = await AdsManager.showDetailScreenInterstitialAd('chalengedetailback');
-      if (adShown) {
-        console.log('Challenge detail back ad shown, navigating after ad closes');
-      }
+      setTimeout(async () => {
+        await AdsManager.showDetailScreenInterstitialAd('chalengedetailback');
+      }, 100);
+
+      // const adShown = await AdsManager.showDetailScreenInterstitialAd('chalengedetailback');
+      // if (adShown) {
+      //   console.log('Challenge detail back ad shown, navigating after ad closes');
+      // }
       if (searchParams?.from === "/challengeDetails") {
         router.replace("/challenge");
       } else {
@@ -283,9 +240,7 @@ export default function ChallengeDetailsScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBackPress}>
-          {/* <Feather name="arrow-left" size={24} style={{ color: colors.textPrimary }} /> */}
           <View style={[styles.closeBtnCircle, { backgroundColor: colors.cardBackground }]}>
-            {/* <Text style={[styles.closeBtnX, { color: colors.textPrimary }]}>✕</Text> */}
             <Ionicons name="chevron-back" size={28} color={colors.textSecondary} />
           </View>
         </TouchableOpacity>
@@ -308,7 +263,6 @@ export default function ChallengeDetailsScreen() {
           </TouchableOpacity>
         </View>
       </View>
-
       <ScrollView style={styles.content}>
         <View style={[styles.challengeHeader, { backgroundColor: colors.cardBackground }]}>
           <View style={[styles.iconContainer, { backgroundColor: colors.background }]}>
@@ -379,42 +333,12 @@ export default function ChallengeDetailsScreen() {
             </View>
           </View>
         </View>
-
-        {/* <View style={styles.statusSection}>
-          <Text style={styles.statusLabel}>Status</Text>
-          <View
-            style={[
-              styles.statusBadge,
-              challenge.completed ? styles.statusCompleted : styles.statusPending,
-            ]}
-          >
-            <Text
-              style={[
-                styles.statusText,
-                challenge.completed
-                  ? styles.statusTextCompleted
-                  : styles.statusTextPending,
-              ]}
-            >
-              {challenge.completed ? 'Completed' : 'In Progress'}
-            </Text>
-          </View>
-        </View> */}
       </ScrollView>
-      {/* {bannerConfig?.show && (
-        <View style={styles.stickyAdContainer}>
-          <GAMBannerAd
-            unitId={bannerConfig.id}
-            sizes={[BannerAdSize.BANNER]}
-            requestOptions={{ requestNonPersonalizedAdsOnly: true }}
-          />
-        </View>
-      )} */}
       {bannerConfig?.show && !isPremium && (
         <View style={styles.stickyAdContainer}>
           <GAMBannerAd
             unitId={bannerConfig.id}
-            sizes={[BannerAdSize.BANNER]}
+            sizes={[BannerAdSize.ANCHORED_ADAPTIVE_BANNER]}
             requestOptions={{ requestNonPersonalizedAdsOnly: true }}
           />
         </View>

@@ -18,6 +18,7 @@ import {
   GAMBannerAd
 } from 'react-native-google-mobile-ads';
 import { useTheme } from '../contexts/ThemeContext';
+import { useScreenTracking } from '../hooks/useScreenTracking';
 import AdsManager from '../services/adsManager';
 
 export default function TimeFormatSettings() {
@@ -28,6 +29,7 @@ export default function TimeFormatSettings() {
   const [is24Hour, setIs24Hour] = useState(false);
   const [userLocale, setUserLocale] = useState('en-US');
   const [hasManualOverride, setHasManualOverride] = useState(false);
+  useScreenTracking('time_format_screen');
   const [bannerConfig, setBannerConfig] = useState<{
     show: boolean;
     id: string;
@@ -273,7 +275,7 @@ export default function TimeFormatSettings() {
         <View style={styles.stickyAdContainer}>
           <GAMBannerAd
             unitId={bannerConfig.id}
-            sizes={[BannerAdSize.BANNER]}
+            sizes={[BannerAdSize.ANCHORED_ADAPTIVE_BANNER]}
             requestOptions={{ requestNonPersonalizedAdsOnly: true }}
           />
         </View>

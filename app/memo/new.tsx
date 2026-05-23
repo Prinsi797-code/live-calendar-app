@@ -28,6 +28,7 @@ import {
 } from 'react-native-google-mobile-ads';
 import { CustomToast } from '../../components/CustomToast';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useScreenTracking } from '../../hooks/useScreenTracking';
 import AdsManager from '../../services/adsManager';
 import NotificationService from '../../services/NotificationService';
 import PurchaseManager from '../../services/purchaseManager';
@@ -54,7 +55,7 @@ export default function NewMemoScreen() {
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [memos, setMemos] = useState([]);
   const [is24Hour, setIs24Hour] = useState(false);
-
+  useScreenTracking('new_memo_screen');
   const [isSaving, setIsSaving] = useState(false);
   const [bannerConfig, setBannerConfig] = useState<{
     show: boolean;
@@ -295,12 +296,17 @@ export default function NewMemoScreen() {
         console.log('👑 Premium user — skipping ad');
       } else {
         console.log('Attempting to show memo save ad...');
-        const adShown = await AdsManager.showEventScreenInterstitialAd('CreateMemo', 'save');
-        if (adShown) {
-          console.log('Memo save ad shown');
-        } else {
-          console.log('Ad not shown, navigating normally');
-        }
+
+        setTimeout(async () => {
+            await AdsManager.showEventScreenInterstitialAd('CreateMemo', 'save');
+        }, 100);
+
+        // const adShown = await AdsManager.showEventScreenInterstitialAd('CreateMemo', 'save');
+        // if (adShown) {
+        //   console.log('Memo save ad shown');
+        // } else {
+        //   console.log('Ad not shown, navigating normally');
+        // }
       }
       router.replace({
         pathname: '/memo',
@@ -483,12 +489,12 @@ export default function NewMemoScreen() {
         router.replace("/memo");
         return;
       } else {
-        console.log('🎬 Cancel pressed, attempting to show ad...');
-        const adShown = await AdsManager.showEventScreenInterstitialAd('CreateMemo', 'back');
-        if (adShown) {
-          console.log('Cancel ad shown, navigating after ad closes');
-        }
         router.replace("memo");
+      
+        setTimeout(async () => {
+            await AdsManager.showEventScreenInterstitialAd('CreateMemo', 'back');
+        }, 100);
+        
       }
     } catch (error) {
       console.error("Cancel error:", error);
@@ -525,7 +531,7 @@ export default function NewMemoScreen() {
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <Text style={styles.saveText}>
-                {isEditMode ? t('update') : t('save')}
+                {isEditMode ? t('save') : t('save')}
               </Text>
             )}
           </TouchableOpacity>

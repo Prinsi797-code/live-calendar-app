@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Animated, Dimensions, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { useScreenTracking } from '../hooks/useScreenTracking';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -25,11 +26,15 @@ export default function YearView() {
     const [isInitialized, setIsInitialized] = useState(false);
     const currentYear = new Date().getFullYear();
     const SWIPE_THRESHOLD = 60;
+    useScreenTracking('year_screen');
     const [bannerConfig, setBannerConfig] = useState<{
         show: boolean;
         id: string;
         position: string;
     } | null>(null);
+
+    const viewScale = useRef(new Animated.Value(1)).current;
+    const viewOpacity = useRef(new Animated.Value(1)).current;
 
     const formatDate = (d) => (d < 10 ? `0${d}` : d);
 
@@ -103,16 +108,58 @@ export default function YearView() {
         }
     };
 
+    // useFocusEffect(
+    //     useCallback(() => {
+    //         if (params.resetYear === 'true') {
+    //             console.log('🔄 Reset year requested via params');
+    //             const currentYear = new Date().getFullYear();
+    //             setSelectedYear(currentYear);
+    //             saveYear(currentYear);
+    //         }
+    //     }, [params.resetYear])
+    // );
+
     useFocusEffect(
         useCallback(() => {
+            loadFirstDay();
+
+            Animated.parallel([
+                Animated.timing(viewScale, {
+                    toValue: 1,
+                    duration: 250,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(viewOpacity, {
+                    toValue: 1,
+                    duration: 250,
+                    useNativeDriver: true,
+                })
+            ]).start();
+
             if (params.resetYear === 'true') {
-                console.log('🔄 Reset year requested via params');
                 const currentYear = new Date().getFullYear();
                 setSelectedYear(currentYear);
                 saveYear(currentYear);
             }
         }, [params.resetYear])
     );
+
+    useEffect(() => {
+        const prevCallback = global.firstDayChanged;
+
+        global.firstDayChanged = (day: number) => {
+            console.log('Year View - First day changed:', day);
+            setFirstDayOfWeek(day);
+            setRefreshKey(prev => prev + 1);
+
+            // CalendarScreen ka callback bhi call karo agar exist kare
+            if (prevCallback) prevCallback(day);
+        };
+
+        return () => {
+            global.firstDayChanged = prevCallback;
+        };
+    }, []);
 
     useEffect(() => {
         Animated.loop(
@@ -159,6 +206,23 @@ export default function YearView() {
         }
     };
 
+    const animateOutAndNavigate = (navigateCallback: () => void) => {
+        Animated.parallel([
+            Animated.timing(viewScale, {
+                toValue: 0.85, // Scale down (Zoom out effect)
+                duration: 250,
+                useNativeDriver: true,
+            }),
+            Animated.timing(viewOpacity, {
+                toValue: 0, // Fade out completely
+                duration: 250,
+                useNativeDriver: true,
+            })
+        ]).start(() => {
+            navigateCallback(); // Navigation starts after animation ends
+        });
+    };
+
     const getDaysInMonth = (month: number, year: number) => {
         return new Date(year, month + 1, 0).getDate();
     };
@@ -182,36 +246,38 @@ export default function YearView() {
     };
 
     const handleMonthPress = (monthIndex: number) => {
-        console.log(`Navigating to month ${monthIndex + 1} of year ${selectedYear}`);
-
+        console.log(`Navigating to month ${monthIndex + 1} with Zoom Out`);
         const targetDate = `${selectedYear}-${String(monthIndex + 1).padStart(2, '0')}-01`;
 
-        router.push({
-            pathname: '/',
-            params: {
-                refresh: Date.now().toString(),
-                navigateToMonth: 'true',
-                targetDate: targetDate,
-                targetYear: selectedYear.toString(),
-                targetMonth: (monthIndex + 1).toString()
-            }
+        animateOutAndNavigate(() => {
+            router.push({
+                pathname: '/',
+                params: {
+                    refresh: Date.now().toString(),
+                    navigateToMonth: 'true',
+                    targetDate: targetDate,
+                    targetYear: selectedYear.toString(),
+                    targetMonth: (monthIndex + 1).toString()
+                }
+            });
         });
     };
 
     const handleDatePress = (monthIndex: number, day: number) => {
-        console.log(`Navigating to ${selectedYear}-${monthIndex + 1}-${day}`);
-
+        console.log(`Navigating to date with Zoom Out`);
         const targetDate = `${selectedYear}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
-        router.push({
-            pathname: '/',
-            params: {
-                refresh: Date.now().toString(),
-                navigateToDate: 'true',
-                targetDate: targetDate,
-                targetYear: selectedYear.toString(),
-                targetMonth: (monthIndex + 1).toString()
-            }
+        animateOutAndNavigate(() => {
+            router.push({
+                pathname: '/',
+                params: {
+                    refresh: Date.now().toString(),
+                    navigateToDate: 'true',
+                    targetDate: targetDate,
+                    targetYear: selectedYear.toString(),
+                    targetMonth: (monthIndex + 1).toString()
+                }
+            });
         });
     };
 
@@ -469,7 +535,6 @@ export default function YearView() {
                 onPress={() => handleMonthPress(monthIndex)}
                 activeOpacity={0.8}
             >
-                {/* ✅ Sirf current month ke liye beam dikhao */}
                 {selectedYear === currentYear && monthIndex === currentMonth && (
                     <CardBorderBeam color={colors.primary} />
                 )}
@@ -541,16 +606,18 @@ export default function YearView() {
                 </View>
             </View>
 
-            <View
-                style={{ flex: 1 }}
-                {...panResponder.panHandlers}
-            >
-                <ScrollView
-                    contentContainerStyle={styles.content}
-                    showsVerticalScrollIndicator={false}
+            <View style={{ flex: 1 }} {...panResponder.panHandlers}>
+                <Animated.View
+                    style={{
+                        flex: 1,
+                        transform: [{ scale: viewScale }],
+                        opacity: viewOpacity
+                    }}
                 >
-                    {months.map((month, index) => renderMonthCalendar(index))}
-                </ScrollView>
+                    <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                        {months.map((month, index) => renderMonthCalendar(index))}
+                    </ScrollView>
+                </Animated.View>
             </View>
             <View style={{ position: "absolute", right: 16, bottom: 80 }}>
                 <Animated.View

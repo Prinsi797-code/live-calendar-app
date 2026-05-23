@@ -4,6 +4,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Localization from 'expo-localization';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useScreenTracking } from '../../hooks/useScreenTracking';
 
 import { useTranslation } from "react-i18next";
 import {
@@ -55,6 +56,7 @@ export default function NewDiaryScreen() {
     const [showTimePicker, setShowTimePicker] = useState(false);
     const [showIOSPicker, setShowIOSPicker] = useState(false);
     const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
+    useScreenTracking('diary_screen');
 
     // Add refs for TextInput
     const titleInputRef = useRef<TextInput>(null);
@@ -274,21 +276,19 @@ export default function NewDiaryScreen() {
 
             if (isPremium) {
                 console.log('👑 Premium user — skipping ad');
+                router.back();
             } else {
-                // Free user — ad dikhao
-                console.log('Attempting to show diary save ad...');
-                const adShown = await AdsManager.showEventScreenInterstitialAd('CreateDiary', 'save');
-                if (adShown) {
-                    console.log('Diary save ad shown');
+               const adShown = await AdsManager.showEventScreenInterstitialAd('CreateDiary', 'save');
+               if (adShown) {
+                    console.log('Ad successfully triggered. Giving delay for safe navigation...');
+                    setTimeout(() => {
+                        router.back();
+                    }, 1000);
                 } else {
-                    console.log('Ad not shown, navigating normally');
+                    console.log('Ad failed to load or not ready, going back immediately');
+                    router.back();
                 }
             }
-            setTimeout(() => router.back(), 200);
-
-            // setTimeout(async () => {
-            //     await AdsManager.showSaveButtonAd();
-            // }, 800);
         } catch (error) {
             console.error('Error saving diary:', error);
             showToast(t("failed_diary") || "Failed to save diary");
@@ -381,12 +381,18 @@ export default function NewDiaryScreen() {
                 console.log('👑 Premium user — skipping ad');
                 router.replace("diary");
             } else {
-                console.log('🎬 Diary cancel pressed, attempting to show ad...');
-                const adShown = await AdsManager.showEventScreenInterstitialAd('CreateDiary', 'back');
-                if (adShown) {
-                    console.log('Diary cancel ad shown, navigating after ad closes');
-                }
+                
                 router.replace("diary");
+
+            setTimeout(async () => {
+                await AdsManager.showEventScreenInterstitialAd('CreateDiary', 'back');
+            }, 100);
+
+                // console.log('🎬 Diary cancel pressed, attempting to show ad...');
+                // const adShown = await AdsManager.showEventScreenInterstitialAd('CreateDiary', 'back');
+                // if (adShown) {
+                //     console.log('Diary cancel ad shown, navigating after ad closes');
+                // }
             }
         } catch (error) {
             console.error("Cancel error:", error);

@@ -32,7 +32,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [theme, setThemeState] = useState<Theme>('system'); // default: system
   const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
-  const systemColorScheme = useColorScheme(); // 👈 device ka actual theme
+  const systemColorScheme = useColorScheme(); 
 
   useEffect(() => {
     loadTheme();

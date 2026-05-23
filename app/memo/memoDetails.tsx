@@ -18,6 +18,7 @@ import {
     GAMBannerAd
 } from 'react-native-google-mobile-ads';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useScreenTracking } from '../../hooks/useScreenTracking';
 import AdsManager from '../../services/adsManager';
 import NotificationService from '../../services/NotificationService';
 import PurchaseManager from '../../services/purchaseManager';
@@ -41,8 +42,8 @@ export default function MemoDetailsScreen() {
     const { colors } = useTheme();
     const [isPremium, setIsPremium] = useState(false);
     const { width } = Dimensions.get('window');
-
     const [is24Hour, setIs24Hour] = useState(false);
+    useScreenTracking('memo_details_screen');
     const [bannerConfig, setBannerConfig] = useState<{
         show: boolean;
         id: string;
@@ -173,10 +174,15 @@ export default function MemoDetailsScreen() {
                 return;
             } else {
                 console.log('Memo detail back pressed, attempting to show ad...');
-                const adShown = await AdsManager.showDetailScreenInterstitialAd('memodetailback');
-                if (adShown) {
-                    console.log('Memo detail back ad shown, navigating after ad closes');
-                }
+
+                setTimeout(async () => {
+                    await AdsManager.showDetailScreenInterstitialAd('memodetailback');
+                }, 100);
+
+                // const adShown = await AdsManager.showDetailScreenInterstitialAd('memodetailback');
+                // if (adShown) {
+                //     console.log('Memo detail back ad shown, navigating after ad closes');
+                // }
                 router.replace("/memo");
             }
         } catch (error) {
@@ -342,7 +348,7 @@ export default function MemoDetailsScreen() {
                 <View style={styles.stickyAdContainer}>
                     <GAMBannerAd
                         unitId={bannerConfig.id}
-                        sizes={[BannerAdSize.BANNER]}
+                        sizes={[BannerAdSize.ANCHORED_ADAPTIVE_BANNER]}
                         requestOptions={{ requestNonPersonalizedAdsOnly: true }}
                     />
                 </View>

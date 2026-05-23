@@ -5,7 +5,6 @@ import * as Sentry from '@sentry/react-native';
 import * as Notifications from 'expo-notifications';
 import { useNavigation, useRouter } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
-// import * as StoreReview from 'expo-store-review';
 import * as StoreReview from 'expo-store-review';
 import LottieView from 'lottie-react-native';
 import React, { useEffect, useRef, useState } from 'react';
@@ -18,6 +17,7 @@ import LocationService from '../services/LocationService';
 import NotificationService from '../services/NotificationService';
 import OnboardingService from '../services/OnboardingService';
 import PurchaseManager from '../services/purchaseManager';
+import { initAnalytics, trackAppOpen, trackEvent, trackScreen } from '../utils/analytics';
 import { initializeI18n } from '../utils/i18n';
 
 // Initialize Sentry - Only in Production
@@ -122,7 +122,6 @@ function SplashScreen({ onComplete, skipAd = false }: { onComplete: () => void; 
 
         const splashConfig = config.splash_screen;
 
-        //Check if splash ads are enabled (inter_ads_flag > 0)
         if (!splashConfig || splashConfig.inter_ads_flag === 0) {
           console.log('Splash ads disabled (flag = 0)');
           setAdStatus('Ads disabled');
@@ -223,6 +222,7 @@ function DrawerNavigator() {
       try {
         const state = navigation.getState();
         const route = state.routes[state.index];
+        trackScreen(route.name);
         setCurrentRouteName(route.name);
       } catch (error) {
         console.error('Error tracking route:', error);
@@ -396,50 +396,51 @@ function DrawerNavigator() {
     }
     initStartedRef.current = true;
 
+
     const initializeApp = async () => {
       try {
-        console.log('🚀 Starting app initialization...');
-
-        // PREMIUM CHECK — pehle hi check karo
+        await initAnalytics();
+        await trackAppOpen();
+        
         await PurchaseManager.initialize();
         const premiumStatus = await PurchaseManager.checkAndRestorePremium();
-        console.log('👑 Premium status on app start:', premiumStatus);
 
         const lastNotification = await NotificationService.getLastNotificationResponse();
         const isFromNotification = !!lastNotification;
 
-        if (isFromNotification) {
-          const notificationData = lastNotification.notification.request.content.data;
-          console.log('App opened from notification:', notificationData);
+        trackEvent('app_open', {
+          source: isFromNotification ? 'notification' : 'direct',
+          is_premium: premiumStatus ? 'true' : 'false',
+        });
 
-          // Initialize ads WITHOUT loading floor_inter
-          console.log('Skipping floor_inter load (notification open)');
+        if (isFromNotification) {
+          // ✅ Flag set karo
+          await AsyncStorage.setItem('opened_from_notification', 'true');
+
+          const notificationData = lastNotification.notification.request.content.data;
           if (!premiumStatus) {
             await AdsManager.initializeAdsWithoutFloorInter();
           }
           await initializeI18n();
 
-          console.log('Ads (without floor_inter) and i18n ready');
-
           const routeData = await getNotificationRouteData(notificationData);
           if (routeData) {
-            console.log('Setting initial route from notification:', routeData.pathname);
             setInitialRoute(routeData);
             setOpenedFromNotification(true);
-
-            console.log('Skipping splash ad (opened from notification)');
             setShowSplashAd(false);
             setIsReady(true);
             return;
           }
         }
 
-        // Premium nahi hai tabhi ads load karo
+        await AsyncStorage.removeItem('opened_from_notification');
+
+
         if (!premiumStatus) {
           console.log('Normal launch - loading ads');
           await AdsManager.initializeAds();
         } else {
-          console.log('✅ Premium user — ads not initialized');
+          console.log('Premium user — ads not initialized');
         }
         await initializeI18n();
 
@@ -492,10 +493,9 @@ function DrawerNavigator() {
         }
 
         const premiumStatus = await PurchaseManager.isPremium();
-        // const isTrialActive = await TrialManager.isTrialActive();
 
         if (premiumStatus) {
-          console.log('✅ Premium user - skipping main screen ad');
+          console.log('Premium user - skipping main screen ad');
           return;
         }
         await AdsManager.showMainScreenAd();
@@ -737,22 +737,21 @@ function CustomHeader() {
       <View style={styles.rightIcons}>
         <TouchableOpacity
           onPress={() => router.push('/PremiumScreen')}
-          style={styles.premiumButton}
+          style={[styles.premiumButton, { backgroundColor: colors.cardBackground }]}
         >
           <View style={[styles.premiumBadge]}>
-            {/* <image>crown 1.png */}
-            {/* <Image source={require('../assets/icons/crown1.png')} style={styles.primiIconImage} resizeMode="contain"/> */}
             <Ionicons name="diamond" size={24} color="#FF5252" />
           </View>
         </TouchableOpacity>
 
+        {/* <View style={[styles.closeBtnCircle, { backgroundColor: colors.cardBackground }]}></View> */}
         <TouchableOpacity
-          style={styles.iconButton}
+          style={[styles.iconButton, { backgroundColor: colors.cardBackground }]}
           onPress={() => router.push('/search')}
         >
           <Feather
             name="search"
-            size={22}
+            size={24}
             color={theme === 'dark' ? colors.white : colors.textPrimary}
           />
         </TouchableOpacity>
@@ -1000,15 +999,6 @@ function DrawerContent({ navigation }: any) {
         </TouchableOpacity>
       </ScrollView>
       <Image source={require("../assets/images/bottom-flower.png")} style={styles.bottomFixedImage} />
-      {/* <View style={styles.bottomFixedImage}>
-        <LottieView
-          ref={lottieRef}
-          source={require('../assets/images/bottom-flower.json')}
-          autoPlay
-          loop={false}
-          style={{ width: 275, height: 200 }}
-        />
-      </View> */}
       <FirstDaySelector
         visible={showFirstDaySelector}
         onClose={() => setShowFirstDaySelector(false)}
@@ -1103,11 +1093,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingTop: 60,
   },
-  premiumButton: { padding: 2 },
+  premiumButton: { padding: 0, width: 40, height: 40, borderRadius: 50, alignItems: 'center', justifyContent: 'center', },
   premiumBadge: {
-    width: 34, height: 34, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center',
-    // borderWidth: 1, borderColor: '#FFE0B2',
   },
   menuButton: {
     padding: 8,
@@ -1160,7 +1148,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   iconButton: {
-    padding: 4,
+    // padding: 2,
+    width: 40, height: 40, borderRadius: 50,
+    alignItems: 'center', justifyContent: 'center',
   },
   icon: {
     fontSize: 20,
@@ -1227,7 +1217,6 @@ const styles = StyleSheet.create({
   primiIconImage: {
     width: 35,
     height: 35,
-    // marginRight: 12,
   },
   menuIconText: {
     fontSize: 24,
@@ -1242,7 +1231,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginRight: 8,
   },
-  // First Day Selector Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

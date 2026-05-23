@@ -1,6 +1,11 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from 'expo-speech-recognition';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -18,6 +23,7 @@ import {
   GAMBannerAd
 } from 'react-native-google-mobile-ads';
 import { useTheme } from '../contexts/ThemeContext';
+import { useScreenTracking } from '../hooks/useScreenTracking';
 import AdsManager from '../services/adsManager';
 import { loadData } from '../utils/storage';
 
@@ -46,7 +52,12 @@ export default function SearchScreen() {
   const startDate = `${currentYear}-01-01T00:00:00Z`;
   const endDate = `${currentYear + 3}-12-31T23:59:59Z`;
 
+  const [isListening, setIsListening] = useState(false);
+  const [voiceLang, setVoiceLang] = useState('EN');
+
+
   const inputRef = useRef<TextInput>(null);
+  useScreenTracking('search_screen');
 
   useEffect(() => {
     loadAllData();
@@ -69,6 +80,41 @@ export default function SearchScreen() {
     };
     loadTimeFormat();
   }, []);
+
+  useSpeechRecognitionEvent('result', (event) => {
+    const transcript = event.results[0]?.transcript || '';
+    setSearchQuery(transcript);
+  });
+
+  useSpeechRecognitionEvent('end', () => {
+    setIsListening(false);
+  });
+
+  useSpeechRecognitionEvent('error', () => {
+    setIsListening(false);
+  });
+
+  // Voice search start
+  const startVoiceSearch = async () => {
+    const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    if (!granted) {
+      alert('Microphone permission required!');
+      return;
+    }
+    setIsListening(true);
+    setSearchQuery('');
+    ExpoSpeechRecognitionModule.start({
+      lang: i18n.language === 'hi' ? 'hi-IN' : 'en-US',
+      interimResults: true,
+      continuous: false,
+    });
+    setVoiceLang(i18n.language === 'hi' ? 'HI' : 'EN');
+  };
+
+  const stopVoiceSearch = () => {
+    ExpoSpeechRecognitionModule.stop();
+    setIsListening(false);
+  };
 
   useEffect(() => {
     const config = AdsManager.getBannerConfig('home');
@@ -308,30 +354,29 @@ export default function SearchScreen() {
     inputRef.current?.clear();
   };
 
-  // const handleBackPress = () => {
-  //   setSearchQuery('');
-
-  //   const today = new Date();
-  //   const todayString = today.toISOString().split('T')[0];
-
-  //   router.push({
-  //     pathname: '/',
-  //     params: {
-  //       refresh: Date.now().toString(),
-  //       resetToToday: 'true'
-  //     }
-  //   });
-  // };
+useFocusEffect(
+  React.useCallback(() => {
+    // Screen pe aane par
+    return () => {
+      // Screen se jaane par — cleanup
+      stopVoiceSearch();
+      setSearchQuery('');
+      setIsListening(false);
+    };
+  }, [])
+);
 
 
   const handleBackPress = async () => {
     try {
+      stopVoiceSearch();
       setSearchQuery('');
       console.log('Search back pressed, attempting to show ad...');
-      const adShown = await AdsManager.showEventScreenInterstitialAd('Search', 'back');
-      if (adShown) {
-        console.log('Search back ad shown, navigating after ad closes');
-      }
+
+      setTimeout(async () => {
+        await AdsManager.showEventScreenInterstitialAd('Search', 'back');
+      }, 100);
+
       const today = new Date();
       const todayString = today.toISOString().split('T')[0];
       router.push({
@@ -353,9 +398,6 @@ export default function SearchScreen() {
       });
     }
   };
-
-
-
   const groupedItems = groupItemsByDate();
 
   if (loading) {
@@ -387,6 +429,14 @@ export default function SearchScreen() {
         </TouchableOpacity>
 
         <View style={styles.searchInputContainer}>
+          {isListening && (
+            <View style={styles.voicePill}>
+              <Ionicons name="mic" size={14} color="#fff" />
+              <View style={styles.voiceDivider} />
+              <Text style={styles.voiceLangText}>{voiceLang}</Text>
+            </View>
+          )}
+
           <TextInput
             ref={inputRef}
             style={[
@@ -394,14 +444,37 @@ export default function SearchScreen() {
               {
                 backgroundColor: colors.cardBackground,
                 color: colors.textPrimary,
+                paddingLeft: isListening ? 90 : 16, // pill ke liye space
               },
             ]}
-            placeholder={t("search_events")}
+            placeholder={t('search_events')}
             placeholderTextColor={colors.textTertiary}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoFocus
           />
+
+          <View style={styles.inputRightIcons}>
+            {searchQuery.length > 0 ? (
+              // X button — text ho tab
+              <TouchableOpacity onPress={handleClearSearch} style={styles.inputIconBtn}>
+                <Feather name="x" size={18} color={colors.textTertiary} />
+              </TouchableOpacity>
+            ) : (
+              // Mic button — text na ho tab
+              <TouchableOpacity
+                onPress={isListening ? stopVoiceSearch : startVoiceSearch}
+                style={styles.inputIconBtn}
+              >
+                <Ionicons
+                  name={isListening ? 'mic' : 'mic-outline'}
+                  size={20}
+                  color={isListening ? '#FF3B30' : colors.textTertiary}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+{/* 
           {searchQuery.length > 0 && (
             <TouchableOpacity
               style={styles.clearButton}
@@ -409,7 +482,7 @@ export default function SearchScreen() {
             >
               <Feather name="x" size={20} color={colors.textTertiary} />
             </TouchableOpacity>
-          )}
+          )} */}
         </View>
 
         <TouchableOpacity
@@ -553,21 +626,6 @@ export default function SearchScreen() {
               {t("no_results_found")}
             </Text>
           </View>
-          // <View style={styles.noResultsContainer}>
-          //   <Feather
-          //     name="search"
-          //     size={64}
-          //     color={colors.textTertiary}
-          //     style={styles.noResultsIcon}
-          //   />
-          //   <Text
-          //     style={[styles.noResultsText, { color: colors.textTertiary }]}
-          //   >
-          //     {searchQuery.trim() === ''
-          //       ? t('start_typing_to_search')
-          //       : t('no_results_found')}
-          //   </Text>
-          // </View>
         )}
       </ScrollView>
       {bannerConfig?.show && (
@@ -611,6 +669,42 @@ const styles = StyleSheet.create({
   },
   backButton: {
     // padding: 4,
+  },
+  voicePill: {
+    position: 'absolute',
+    left: 10,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF3B30',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    gap: 4,
+  },
+  voiceDivider: {
+    width: 1,
+    height: 14,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  voiceLangText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  inputRightIcons: {
+    position: 'absolute',
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  inputIconBtn: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 16,
   },
   titleRow: {
     flexDirection: 'row',

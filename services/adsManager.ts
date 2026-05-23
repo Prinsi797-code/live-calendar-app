@@ -5,6 +5,7 @@ import {
   InterstitialAd,
   TestIds,
 } from 'react-native-google-mobile-ads';
+import { trackAdShown } from '../utils/analytics';
 import { fetchAppConfig } from '../utils/firebaseConfig';
 
 interface AdConfig {
@@ -260,6 +261,7 @@ class AdsManager {
     try {
       this.isShowingAd = true;
       await this.mainScreenInterstitialAd.show();
+      trackAdShown('main_screen', 'main_screen'); // ← add karo
       console.log('Main screen ad shown successfully');
       return true;
     } catch (e) {
@@ -598,6 +600,7 @@ class AdsManager {
 
       // Show the ad
       await adToShow.show();
+      trackAdShown(adType, 'splash_screen'); // ← add karo
 
       // Save based on frequency
       if (frequency === 1) {
@@ -843,6 +846,7 @@ class AdsManager {
     try {
       this.isShowingAd = true;
       await adToShow.show();
+      trackAdShown(adType, 'setting_screen');
 
       // Update cooldown
       this.recentAdShown = {
@@ -939,6 +943,7 @@ class AdsManager {
     try {
       this.isShowingAd = true;
       await adToShow.show();
+      trackAdShown(adType, screenName);
 
       // Update cooldown
       this.recentAdShown = {
@@ -1035,6 +1040,7 @@ class AdsManager {
     try {
       this.isShowingAd = true;
       await adToShow.show();
+      trackAdShown(adType, screenName);
 
       // Update cooldown
       this.recentAdShown = {

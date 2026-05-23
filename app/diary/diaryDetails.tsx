@@ -20,10 +20,10 @@ import {
     GAMBannerAd
 } from 'react-native-google-mobile-ads';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useScreenTracking } from '../../hooks/useScreenTracking';
 import AdsManager from '../../services/adsManager';
 import NotificationService from '../../services/NotificationService';
 import PurchaseManager from '../../services/purchaseManager';
-
 interface Diary {
     id: string;
     title: string;
@@ -42,6 +42,7 @@ export default function DiaryDetailsScreen() {
     const { colors } = useTheme();
     const searchParams = useLocalSearchParams();
     const [is24Hour, setIs24Hour] = useState(false);
+    useScreenTracking('diary_details_screen');
     const [bannerConfig, setBannerConfig] = useState<{
         show: boolean;
         id: string;
@@ -196,10 +197,15 @@ export default function DiaryDetailsScreen() {
                 return;
             } else {
                 console.log('Diary detail back pressed, attempting to show ad...');
-                const adShown = await AdsManager.showDetailScreenInterstitialAd('Diarydetailback');
-                if (adShown) {
-                    console.log('Diary detail back ad shown, navigating after ad closes');
-                }
+
+                setTimeout(async () => {
+                    await AdsManager.showDetailScreenInterstitialAd('Diarydetailback');
+                }, 100);
+
+                // const adShown = await AdsManager.showDetailScreenInterstitialAd('Diarydetailback');
+                // if (adShown) {
+                //     console.log('Diary detail back ad shown, navigating after ad closes');
+                // }
                 router.replace("/diary");
             }
         } catch (error) {
@@ -352,7 +358,7 @@ export default function DiaryDetailsScreen() {
                 <View style={styles.stickyAdContainer}>
                     <GAMBannerAd
                         unitId={bannerConfig.id}
-                        sizes={[BannerAdSize.BANNER]}
+                        sizes={[BannerAdSize.ANCHORED_ADAPTIVE_BANNER]}
                         requestOptions={{ requestNonPersonalizedAdsOnly: true }}
                     />
                 </View>

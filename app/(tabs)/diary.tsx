@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useScreenTracking } from '../../hooks/useScreenTracking';
 import NotificationService from '../../services/NotificationService';
 
 interface Diary {
@@ -40,6 +41,7 @@ export default function DiaryScreen() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const pulseAnim = useRef(new Animated.Value(0)).current;
+  useScreenTracking('diary_screen');
   const [bannerConfig, setBannerConfig] = useState<{
     show: boolean;
     id: string;

@@ -17,6 +17,7 @@ import {
   GAMBannerAd
 } from 'react-native-google-mobile-ads';
 import { useTheme } from '../contexts/ThemeContext';
+import { useScreenTracking } from '../hooks/useScreenTracking';
 import AdsManager from '../services/adsManager';
 import OnboardingService from '../services/OnboardingService';
 import PurchaseManager from '../services/purchaseManager';
@@ -53,7 +54,7 @@ export default function Language() {
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [isFirstTime, setIsFirstTime] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
-
+  useScreenTracking('diary_screen');
   const [bannerConfig, setBannerConfig] = useState<{
     show: boolean;
     id: string;
@@ -268,9 +269,12 @@ export default function Language() {
         </Text>
 
         <TouchableOpacity onPress={handleDone} style={styles.doneButton}>
-          <Text style={[styles.doneText, { color: colors.primary }]}>
+          {/* <Text style={[styles.doneText, { color: colors.primary }]}>
             {t("done")}
-          </Text>
+          </Text> */}
+          <View style={[styles.closeBtnCircle, { backgroundColor: colors.cardBackground }]}>
+              <Feather name="check" size={26} style={[{ color: colors.primary}]} />
+          </View>
         </TouchableOpacity>
       </View>
 

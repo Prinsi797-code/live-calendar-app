@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import PurchaseManager from '../services/purchaseManager';
@@ -36,7 +37,12 @@ export function useTrial() {
   // Premium nahi hai toh PremiumScreen open karo
   useEffect(() => {
     if (!loading && trialExpiredAndNotPremium) {
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
+        const fromNotif = await AsyncStorage.getItem('opened_from_notification');
+        if (fromNotif === 'true') {
+          console.log('useTrial: Skipping PremiumScreen — opened from notification');
+          return;
+        }
         router.push('/PremiumScreen');
       }, 500);
       return () => clearTimeout(timer);

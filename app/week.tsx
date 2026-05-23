@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { COUNTRY_CALENDAR_IDS } from '../constants/countryCalendars';
 import { useTheme } from '../contexts/ThemeContext';
+import { useScreenTracking } from '../hooks/useScreenTracking';
 import { loadData } from '../utils/storage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -37,6 +38,7 @@ export default function WeekScreen() {
     const isDark = resolvedTheme === 'dark';
     const router = useRouter();
     const { t } = useTranslation();
+    const [refreshKey, setRefreshKey] = useState(0);
     const lightNoEventImg = require("../assets/images/no-events.png");
     const darkNoEventImg = require("../assets/images/dark-no-event.png");
     const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -56,6 +58,8 @@ export default function WeekScreen() {
     const weekStripX = useRef(new Animated.Value(-SCREEN_WIDTH)).current;
 
     const navRef = useRef({ goToNextWeek: () => { }, goToPrevWeek: () => { } });
+
+    useScreenTracking('Week_screen');
 
     // ── Init ──────────────────────────────────────────────────────────────────
     useEffect(() => {
@@ -110,6 +114,23 @@ export default function WeekScreen() {
             fetchAllHolidays(['India']);
         }
     };
+
+    useEffect(() => {
+        const prevCallback = global.firstDayChanged;
+
+        global.firstDayChanged = (day: number) => {
+            console.log('Year View - First day changed:', day);
+            setFirstDayOfWeek(day);
+            setRefreshKey(prev => prev + 1);
+
+            // CalendarScreen ka callback bhi call karo agar exist kare
+            if (prevCallback) prevCallback(day);
+        };
+
+        return () => {
+            global.firstDayChanged = prevCallback;
+        };
+    }, []);
 
     const fetchAllHolidays = async (countries: string[]) => {
         const all: any[] = [];
@@ -268,14 +289,34 @@ export default function WeekScreen() {
 
     const formatEventTime = (event: any): string => {
         if (event.allDay || event.isHoliday) return t('all_day') || 'All Day';
+
+        const parseTime = (timeValue: any): string => {
+            if (!timeValue) return '';
+            try {
+                const time = new Date(parseInt(String(timeValue)));
+                if (isNaN(time.getTime())) return String(timeValue);
+                return time.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                });
+            } catch {
+                return String(timeValue);
+            }
+        };
+
         const sd = event.startDate?.split('T')[0];
         const ed = event.endDate?.split('T')[0];
+        const startFormatted = parseTime(event.startTime);
+        const endFormatted = parseTime(event.endTime);
+
         if (sd !== ed) {
             const s = new Date(sd + 'T00:00:00');
             const e = new Date(ed + 'T00:00:00');
-            return `${s.getDate()} ${s.toLocaleDateString('en-US', { month: 'short' })} to ${e.getDate()} ${e.toLocaleDateString('en-US', { month: 'short' })}, ${event.startTime} to ${event.endTime}`;
+            return `${s.getDate()} ${s.toLocaleDateString('en-US', { month: 'short' })} to ${e.getDate()} ${e.toLocaleDateString('en-US', { month: 'short' })}, ${startFormatted} - ${endFormatted}`;
         }
-        return `${event.startTime} to ${event.endTime}`;
+
+        return `${startFormatted} - ${endFormatted}`;
     };
 
     const getRepeatText = (repeat: string) => {

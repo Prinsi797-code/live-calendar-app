@@ -1,16 +1,21 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from 'expo-speech-recognition';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
   BannerAdSize,
   GAMBannerAd
 } from 'react-native-google-mobile-ads';
 import { COUNTRY_CALENDAR_IDS } from '../constants/countryCalendars';
 import { useTheme } from '../contexts/ThemeContext';
+import { useScreenTracking } from '../hooks/useScreenTracking';
 import AdsManager from '../services/adsManager';
 import NotificationService from '../services/NotificationService';
 
@@ -38,6 +43,10 @@ export default function Holidays() {
   const params = useLocalSearchParams();
   const { t, i18n } = useTranslation();
 
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isListening, setIsListening] = useState(false);
+
   // MAIN FIX: Initialize as null to prevent premature loading
   const [selectedCountries, setSelectedCountries] = useState<string[] | null>(null);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -45,12 +54,53 @@ export default function Holidays() {
   const [error, setError] = useState<string | null>(null);
 
   const currentYear = new Date().getFullYear();
+  useScreenTracking('holiday_screen');
 
   const [bannerConfig, setBannerConfig] = useState<{
     show: boolean;
     id: string;
     position: string;
   } | null>(null);
+
+  // Speech events
+  useSpeechRecognitionEvent('result', (event) => {
+    const transcript = event.results[0]?.transcript || '';
+    setSearchQuery(transcript);
+  });
+  useSpeechRecognitionEvent('end', () => setIsListening(false));
+  useSpeechRecognitionEvent('error', () => setIsListening(false));
+
+  const startVoiceSearch = async () => {
+    const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    if (!granted) { alert('Microphone permission required!'); return; }
+    setSearchQuery('');
+    setIsListening(true);
+    ExpoSpeechRecognitionModule.start({
+      lang: i18n.language === 'hi' ? 'hi-IN' : 'en-US',
+      interimResults: true,
+      continuous: false,
+    });
+  };
+
+  const stopVoiceSearch = () => {
+    ExpoSpeechRecognitionModule.stop();
+    setIsListening(false);
+  };
+
+  const closeSearch = () => {
+    setIsSearching(false);
+    setSearchQuery('');
+    stopVoiceSearch();
+  };
+
+  // Filtered holidays
+  const filteredHolidays = searchQuery.trim()
+    ? holidays.filter(h =>
+      h.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      h.country.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      h.date.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    : holidays;
 
   // Load countries first
   useEffect(() => {
@@ -91,10 +141,6 @@ export default function Holidays() {
   const handleBackPress = async () => {
     try {
       console.log('Attempting to show language back ad...');
-      const adShown = await AdsManager.showSettingScreenInterstitialAd('back');
-      if (adShown) {
-        console.log('Language back ad shown, navigating after ad closes');
-      }
       router.push({
         pathname: '/',
         params: {
@@ -102,6 +148,11 @@ export default function Holidays() {
           resetToToday: 'true'
         }
       });
+
+      setTimeout(async () => {
+        await AdsManager.showSettingScreenInterstitialAd('back');
+      }, 100);
+
     } catch (error) {
       console.error("Back ad error:", error);
       router.push({
@@ -214,9 +265,7 @@ export default function Holidays() {
     }
   };
 
-  // MAIN FIX: Only run when selectedCountries is loaded (not null)
   useEffect(() => {
-    // Don't run if countries haven't loaded yet
     if (selectedCountries === null) {
       console.log('⏳ Waiting for countries to load...');
       return;
@@ -489,17 +538,82 @@ export default function Holidays() {
       {/* </View> */}
       {/* </View> */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={handleBackPress} style={styles.closeBtn} activeOpacity={0.7}>
-          <View style={[styles.closeBtnCircle, { backgroundColor: colors.cardBackground }]}>
-            {/* <Text style={[styles.closeBtnX, { color: colors.textPrimary }]}>✕</Text> */}
-            <Ionicons name="chevron-back" size={28} color={colors.textSecondary} />
-          </View>
-        </TouchableOpacity>
+        {!isSearching ? (
+          <>
+            {/* Normal header */}
+            <TouchableOpacity onPress={handleBackPress} style={styles.closeBtn} activeOpacity={0.7}>
+              <View style={[styles.closeBtnCircle, { backgroundColor: colors.cardBackground }]}>
+                <Ionicons name="chevron-back" size={28} color={colors.textSecondary} />
+              </View>
+            </TouchableOpacity>
 
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-          {t("holiday")} {currentYear}
-        </Text>
-        <View style={styles.backBtn} />
+            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+              {t("holiday")} {currentYear}
+            </Text>
+
+            {/* Search icon right side */}
+            <TouchableOpacity
+              onPress={() => setIsSearching(true)}
+              style={[styles.closeBtnCircle, { backgroundColor: colors.cardBackground }]}
+            >
+              <Feather name="search" size={20} color={colors.textPrimary} />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            {/* Search mode header */}
+            <TouchableOpacity onPress={closeSearch}>
+              <Feather name="x" size={26} color={colors.textPrimary} />
+            </TouchableOpacity>
+
+            {/* Input + Voice pill */}
+            <View style={{ flex: 1, marginHorizontal: 10, position: 'relative', justifyContent: 'center' }}>
+
+              {/* 🔴 iOS voice pill */}
+              {isListening && (
+                <View style={styles.voicePill}>
+                  <Ionicons name="mic" size={13} color="#fff" />
+                  <View style={styles.voiceDivider} />
+                  <Text style={styles.voiceLangText}>
+                    {i18n.language === 'hi' ? 'HI' : 'EN'}
+                  </Text>
+                </View>
+              )}
+
+              <TextInput
+                placeholder={`${t("search")} ${t("holiday")}...`}
+                placeholderTextColor={colors.textTertiary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoFocus
+                style={[styles.searchInput, {
+                  color: colors.textPrimary,
+                  backgroundColor: colors.cardBackground,
+                  paddingLeft: isListening ? 90 : 14,
+                  paddingRight: 40,
+                }]}
+              />
+
+              {/* Right: X ya Mic */}
+              <TouchableOpacity
+                onPress={searchQuery.length > 0
+                  ? () => setSearchQuery('')
+                  : isListening ? stopVoiceSearch : startVoiceSearch}
+                style={styles.inputMicBtn}
+              >
+                {searchQuery.length > 0 ? (
+                  <Feather name="x" size={18} color={colors.textTertiary} />
+                ) : (
+                  <Ionicons
+                    name={isListening ? 'mic' : 'mic-outline'}
+                    size={20}
+                    color={isListening ? '#FF3B30' : colors.textTertiary}
+                  />
+                )}
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </View>
 
       {loading ? (
@@ -516,7 +630,7 @@ export default function Holidays() {
         </View>
       ) : (
         <ScrollView style={styles.content}>
-          {holidays.map((holiday, index) => (
+          {filteredHolidays.map((holiday, index) => (
             <View key={`${holiday.country}_${index}`} style={[styles.card, { backgroundColor: colors.cardBackground }]}>
               <View style={[styles.redBar, { backgroundColor: '#FF433A' }]} />
               <View style={styles.textSection}>
@@ -561,6 +675,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+  },
+  voicePill: {
+    position: 'absolute',
+    left: 6,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF3B30',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  voiceDivider: {
+    width: 1,
+    height: 13,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  voiceLangText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  searchInput: {
+    height: 42,
+    borderRadius: 21,
+    fontSize: 16,
+    paddingHorizontal: 14,
+  },
+  inputMicBtn: {
+    position: 'absolute',
+    right: 8,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   backButton: {
     padding: 8,

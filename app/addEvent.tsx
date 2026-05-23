@@ -29,6 +29,7 @@ import {
 import { CustomToast } from '../components/CustomToast';
 import { NotificationPermissionModal } from '../components/NotificationPermissionModal';
 import { useTheme } from '../contexts/ThemeContext';
+import { useScreenTracking } from '../hooks/useScreenTracking';
 import AdsManager from '../services/adsManager';
 import NotificationService from '../services/NotificationService';
 import { loadData, saveData } from '../utils/storage';
@@ -53,8 +54,8 @@ export default function AddEventScreen() {
     const titleInputRef = useRef<TextInput>(null);
     const [isNoteFocused, setIsNoteFocused] = useState(false);
     const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-
+    useScreenTracking('add_event_screen');
+    
     useFocusEffect(
         useCallback(() => {
             Keyboard.dismiss();

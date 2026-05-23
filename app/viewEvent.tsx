@@ -10,6 +10,7 @@ import {
 } from 'react-native-google-mobile-ads';
 import { useTheme } from '../contexts/ThemeContext';
 import { COUNTRIES } from '../data/countries';
+import { useScreenTracking } from '../hooks/useScreenTracking';
 import AdsManager from '../services/adsManager';
 import NotificationService from '../services/NotificationService';
 import PurchaseManager from '../services/purchaseManager';
@@ -22,6 +23,7 @@ export default function ViewEventScreen() {
     const searchParams = useLocalSearchParams();
     const { t, i18n } = useTranslation();
     const [isPremium, setIsPremium] = useState(false);
+    useScreenTracking('event_detail_screen');
 
     const lightNoEventImg = require("../assets/images/event1.png");
     const darkNoEventImg = require("../assets/images/event2.png");
@@ -468,7 +470,7 @@ ${translatedCountryName ? `${t("country")}:- ${translatedCountryName}` : ""}`;
                 <View style={styles.stickyAdContainer}>
                     <GAMBannerAd
                         unitId={bannerConfig.id}
-                        sizes={[BannerAdSize.BANNER]}
+                        sizes={[BannerAdSize.ANCHORED_ADAPTIVE_BANNER]}
                         requestOptions={{ requestNonPersonalizedAdsOnly: true }}
                     />
                 </View>

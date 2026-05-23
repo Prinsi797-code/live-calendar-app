@@ -9,6 +9,7 @@ import {
   GAMBannerAd
 } from 'react-native-google-mobile-ads';
 import { useTheme } from '../contexts/ThemeContext';
+import { useScreenTracking } from '../hooks/useScreenTracking';
 import AdsManager from '../services/adsManager';
 import NotificationService from '../services/NotificationService';
 
@@ -30,6 +31,7 @@ export default function NotificationMore() {
   const { from } = useLocalSearchParams();
   const { theme, colors } = useTheme();
   const BANNER_HEIGHT = 60;
+  useScreenTracking('notification_screen');
   const [bannerConfig, setBannerConfig] = useState<{
     show: boolean;
     id: string;
@@ -603,7 +605,7 @@ export default function NotificationMore() {
         <View style={styles.stickyAdContainer}>
           <GAMBannerAd
             unitId={bannerConfig.id}
-            sizes={[BannerAdSize.BANNER]}
+            sizes={[BannerAdSize.ANCHORED_ADAPTIVE_BANNER]}
             requestOptions={{ requestNonPersonalizedAdsOnly: true }}
           />
         </View>

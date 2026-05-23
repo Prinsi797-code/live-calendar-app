@@ -15,6 +15,7 @@ import {
     GAMBannerAd
 } from 'react-native-google-mobile-ads';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useScreenTracking } from '../../hooks/useScreenTracking';
 import AdsManager from '../../services/adsManager';
 import PurchaseManager from '../../services/purchaseManager';
 
@@ -92,6 +93,7 @@ export default function CreateScreen() {
     const searchParams = useLocalSearchParams();
     const { t } = useTranslation();
     const [isPremium, setIsPremium] = useState(false);
+    useScreenTracking('create_screen');
     const [bannerConfig, setBannerConfig] = useState<{
         show: boolean;
         id: string;
@@ -147,20 +149,20 @@ export default function CreateScreen() {
 
     const handleBackPress = async () => {
         try {
-            // Premium check
             const isPremium = await PurchaseManager.isPremium();
 
             if (!isPremium) {
-                // Free user — ad dikhao
                 console.log('Challenge detail back pressed, attempting to show ad...');
-                const adShown = await AdsManager.showDetailScreenInterstitialAd('chalengedetailback');
-                if (adShown) {
-                    console.log('👑 Challenge detail back ad shown, navigating after ad closes');
-                }
+                setTimeout(async () => {
+                    await AdsManager.showDetailScreenInterstitialAd('chalengedetailback');
+                }, 100);
+                // const adShown = await AdsManager.showDetailScreenInterstitialAd('chalengedetailback');
+                // if (adShown) {
+                //     console.log('Challenge detail back ad shown, navigating after ad closes');
+                // }
             } else {
-                console.log('👑 Premium user — skipping ad');
+                console.log('Premium user — skipping ad');
             }
-
             if (searchParams?.from === "challenge/create") {
                 router.replace("/challenge");
             } else {
@@ -176,7 +178,6 @@ export default function CreateScreen() {
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
             {/* Header */}
             <View style={styles.header}>
-                {/* <View style={styles.leftContainer}> */}
                 <TouchableOpacity
                     onPress={handleBackPress}
                     style={styles.backButton}

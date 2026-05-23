@@ -3,6 +3,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Network from 'expo-network';
 import { useLocalSearchParams, useRouter } from "expo-router";
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from 'expo-speech-recognition';
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -23,6 +27,7 @@ import {
 import { CustomToast } from '../components/CustomToast';
 import { useTheme } from '../contexts/ThemeContext';
 import { COUNTRIES } from "../data/countries";
+import { useScreenTracking } from '../hooks/useScreenTracking';
 import AdsManager from '../services/adsManager';
 import PurchaseManager from '../services/purchaseManager';
 
@@ -42,6 +47,9 @@ export default function Country({ navigation }: any) {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [isPremium, setIsPremium] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+
+  useScreenTracking('country_screen');
 
   // Show toast function
   const showToast = (message: string) => {
@@ -56,6 +64,30 @@ export default function Country({ navigation }: any) {
     };
     checkPremium();
   }, []);
+
+  useSpeechRecognitionEvent('result', (event) => {
+    const transcript = event.results[0]?.transcript || '';
+    setSearch(transcript);
+  });
+  useSpeechRecognitionEvent('end', () => setIsListening(false));
+  useSpeechRecognitionEvent('error', () => setIsListening(false));
+
+  const startVoiceSearch = async () => {
+    const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    if (!granted) { alert('Microphone permission required!'); return; }
+    setSearch('');
+    setIsListening(true);
+    ExpoSpeechRecognitionModule.start({
+      lang: i18n.language === 'hi' ? 'hi-IN' : 'en-US',
+      interimResults: true,
+      continuous: false,
+    });
+  };
+
+  const stopVoiceSearch = () => {
+    ExpoSpeechRecognitionModule.stop();
+    setIsListening(false);
+  };
 
   const checkNetworkStatus = async () => {
     try {
@@ -263,7 +295,6 @@ export default function Country({ navigation }: any) {
           },
         };
 
-      // Show setting screen save ad
       console.log('🎬 Attempting to show country save ad...');
       const adShown = await AdsManager.showSettingScreenInterstitialAd('save');
 
@@ -296,15 +327,8 @@ export default function Country({ navigation }: any) {
       <View style={styles.header}>
         {!isSearch && (
           <>
-            {/* <View style={styles.leftContainer}> */}
-            {/* <TouchableOpacity
-                onPress={handleBackPress}
-                style={styles.backButton}>
-                <Feather name="arrow-left" size={24} color={colors.textPrimary} />
-              </TouchableOpacity> */}
             <TouchableOpacity onPress={handleBackPress} style={styles.closeBtn} activeOpacity={0.7}>
               <View style={[styles.closeBtnCircle, { backgroundColor: colors.cardBackground }]}>
-                {/* <Text style={[styles.closeBtnX, { color: colors.textPrimary }]}>✕</Text> */}
                 <Ionicons name="chevron-back" size={28} color={colors.textSecondary} />
               </View>
             </TouchableOpacity>
@@ -314,16 +338,13 @@ export default function Country({ navigation }: any) {
             {/* </View> */}
 
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <TouchableOpacity onPress={() => setIsSearch(true)} style={{ marginRight: 10 }}>
-                <Feather name="search" size={22} style={[{ color: colors.textPrimary }]} />
+              <TouchableOpacity onPress={() => setIsSearch(true)} style={[styles.closeBtnCircle, { backgroundColor: colors.cardBackground, marginRight: 10 }]}>
+                <Feather name="search" size={24} style={[{ color: colors.textPrimary }]} />
               </TouchableOpacity>
               <TouchableOpacity onPress={saveCountries} disabled={isSaving}>
-                {/* <View style={[styles.closeBtnCircle, { backgroundColor: colors.primary }]}>
-                  <Feather name="check" size={24} style={[{ color: colors.white, opacity: isSaving ? 0.5 : 1 }]} />
-                </View> */}
-                <Text style={[styles.doneText, { color: colors.primary }]}>
-                  {t("done")}
-                </Text>
+                <View style={[styles.closeBtnCircle, { backgroundColor: colors.cardBackground }]}>
+                  <Feather name="check" size={26} style={[{ color: colors.primary, opacity: isSaving ? 0.5 : 1 }]} />
+                </View>
               </TouchableOpacity>
             </View>
           </>
@@ -331,19 +352,59 @@ export default function Country({ navigation }: any) {
 
         {isSearch && (
           <View style={[styles.searchHeader, { backgroundColor: colors.background }]}>
-            <TouchableOpacity onPress={() => { setIsSearch(false); setSearch(""); }}>
-              <Feather name="x" size={28} style={[{ color: colors.textPrimary }]} />
+            <TouchableOpacity onPress={() => { setIsSearch(false); setSearch(''); stopVoiceSearch(); }}>
+              <Feather name="x" size={28} style={{ color: colors.textPrimary }} />
             </TouchableOpacity>
-            <TextInput
-              placeholder={t("search")}
-              placeholderTextColor="#888"
-              value={search}
-              onChangeText={setSearch}
-              style={[styles.searchInput, { color: colors.textPrimary }]}
-              autoFocus
-            />
+
+            {/* Input + Voice Pill wrapper */}
+            <View style={{ flex: 1, marginHorizontal: 8, position: 'relative', justifyContent: 'center' }}>
+
+              {/* 🔴 iOS style pill — sirf listening me dikhega */}
+              {isListening && (
+                <View style={styles.voicePill}>
+                  <Ionicons name="mic" size={13} color="#fff" />
+                  <View style={styles.voiceDivider} />
+                  <Text style={styles.voiceLangText}>
+                    {i18n.language === 'hi' ? 'HI' : 'EN'}
+                  </Text>
+                </View>
+              )}
+
+              <TextInput
+                placeholder={t('search')}
+                placeholderTextColor="#888"
+                value={search}
+                onChangeText={setSearch}
+                style={[
+                  styles.searchInput,
+                  {
+                    color: colors.textPrimary,
+                    paddingLeft: isListening ? 82 : 10,  // pill ke liye space
+                    paddingRight: 36,                      // mic icon ke liye space
+                  },
+                ]}
+                autoFocus
+              />
+
+              {/* Right side: X ya Mic */}
+              <TouchableOpacity
+                onPress={search.length > 0 ? () => setSearch('') : (isListening ? stopVoiceSearch : startVoiceSearch)}
+                style={styles.inputMicBtn}
+              >
+                {search.length > 0 ? (
+                  <Feather name="x" size={18} color="#888" />
+                ) : (
+                  <Ionicons
+                    name={isListening ? 'mic' : 'mic-outline'}
+                    size={20}
+                    color={isListening ? '#FF3B30' : '#888'}
+                  />
+                )}
+              </TouchableOpacity>
+            </View>
+
             <TouchableOpacity onPress={saveCountries} disabled={isSaving}>
-              <Feather name="check" size={26} style={[{ color: colors.textPrimary, opacity: isSaving ? 0.5 : 1 }]} />
+              <Feather name="check" size={26} style={{ color: colors.textPrimary, opacity: isSaving ? 0.5 : 1 }} />
             </TouchableOpacity>
           </View>
         )}
@@ -406,7 +467,7 @@ export default function Country({ navigation }: any) {
         <View style={styles.stickyAdContainer}>
           <GAMBannerAd
             unitId={bannerConfig.id}
-            sizes={[BannerAdSize.BANNER]}
+            sizes={[BannerAdSize.ANCHORED_ADAPTIVE_BANNER]}
             requestOptions={{ requestNonPersonalizedAdsOnly: true }}
           />
         </View>
@@ -456,6 +517,36 @@ const styles = StyleSheet.create({
   rightIcons: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  voicePill: {
+    position: 'absolute',
+    left: 6,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF3B30',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  voiceDivider: {
+    width: 1,
+    height: 13,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  voiceLangText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  inputMicBtn: {
+    position: 'absolute',
+    right: 6,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   search: {
     height: 40,

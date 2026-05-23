@@ -29,6 +29,7 @@ import {
 } from 'react-native-google-mobile-ads';
 import { CustomToast } from '../../components/CustomToast';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useScreenTracking } from '../../hooks/useScreenTracking';
 import AdsManager from '../../services/adsManager';
 import NotificationService from '../../services/NotificationService';
 import PurchaseManager from '../../services/purchaseManager';
@@ -49,6 +50,7 @@ export default function NewChallengeScreen() {
     const params = useLocalSearchParams();
     const [showPremiumModal, setShowPremiumModal] = useState(false);
     const isEditMode = !!params.id;
+    useScreenTracking('new_challenge_screen');
 
     const getInitialReminderTime = () => {
         const now = new Date();
@@ -234,18 +236,15 @@ export default function NewChallengeScreen() {
         NotificationService.requestPermissions().catch(console.error);
     }, []);
 
-    // Handle edit mode or category selection
     useEffect(() => {
         if (isEditMode && params.id) {
             InteractionManager.runAfterInteractions(() => {
                 loadChallengeData(params.id as string);
             });
         } else {
-            // New challenge - check if coming from category or "Create your own"
             const shouldUseDefaults = !params.title && !params.icon;
 
             if (shouldUseDefaults) {
-                // "Create your own" - use defaults
                 const now = new Date();
                 const defaultReminder = new Date(now.getTime() + 10 * 60000);
 
@@ -263,7 +262,6 @@ export default function NewChallengeScreen() {
                 setEndDate(now);
                 setReminderTime(defaultReminder);
             } else {
-                // Category selection - use provided title/icon
                 if (params.title) {
                     const titleStr = String(params.title);
                     setOriginalTitle(titleStr);
@@ -379,17 +377,13 @@ export default function NewChallengeScreen() {
 
         try {
             setIsSaving(true);
-            // 👑 Check Premium only once
             const isPremium = await PurchaseManager.isPremium();
 
             if (!isPremium) {
-                // ❌ Free user → show premium popup
                 setShowPremiumModal(true);
                 setIsSaving(false);
                 return;
             }
-
-            // 👑 Premium user → Direct save (no ads)
             console.log("Premium user — saving without ads");
 
             await performSave(reminderDateTime);
@@ -553,6 +547,7 @@ export default function NewChallengeScreen() {
             if (isEditMode) {
                 resetToOriginalValues();
             }
+
             const isPremium = await PurchaseManager.isPremium();
 
             if (isPremium) {
@@ -560,16 +555,11 @@ export default function NewChallengeScreen() {
                 router.replace("/challenge/create");
                 return;
             }
-
-            console.log('Event cancelled, attempting to show ad...');
-            const adShown = await AdsManager.showEventScreenInterstitialAd(
-                'CreateChalange',
-                'back'
-            );
-            if (adShown) {
-                console.log('Event cancel ad shown, navigating after ad closes');
-            }
             router.replace("/challenge/create");
+                setTimeout(async () => {
+                await AdsManager.showEventScreenInterstitialAd('CreateChalange', 'back');
+            }, 100);
+
         } catch (error) {
             console.error("Error on back:", error);
             router.replace("/challenge/create");

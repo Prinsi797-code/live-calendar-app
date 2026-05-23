@@ -82,18 +82,11 @@ export default function PremiumScreen() {
     const trialScaleAnim = useRef(new Animated.Value(1)).current;
 
     const [restoring, setRestoring] = useState(false);
-
-    // Current active/purchased plan
     const [activePlanKey, setActivePlanKey] = useState<PlanKey | null>(null);
 
     const scaleAnim = useRef(new Animated.Value(1)).current;
     const { t } = useTranslation();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
-
-    // const bg = isDarkMode ? '#0D0D0D' : '#ffffff';
-    // const cardBg = isDarkMode ? '#1A1A1A' : '#FFFFFF';
-    // const textPrimary = isDarkMode ? '#FFFFFF' : '#1A1A1A';
-    // const textSecondary = isDarkMode ? '#AAAAAA' : '#666666';
     const accent = '#FF5252';
     const activeGreen = '#4CAF50';
     const bg = colors.background;
@@ -238,7 +231,6 @@ export default function PremiumScreen() {
         <View style={[styles.container, { backgroundColor: bg }]}>
             <StatusBar translucent backgroundColor="transparent" barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-
                 {/* Hero */}
                 <View style={styles.heroSection}>
                     <Image
@@ -286,7 +278,7 @@ export default function PremiumScreen() {
                                     styles.planCard,
                                     {
                                         backgroundColor: isActive
-                                            ? colors.successBackground ?? '#F0FFF4'   // add this to your ThemeContext or hardcode
+                                            ? colors.successBackground ?? 'cardBg'
                                             : isSelected
                                                 ? colors.selectedBackground ?? cardBg
                                                 : cardBg,
@@ -508,7 +500,7 @@ export default function PremiumScreen() {
                         <TouchableOpacity
                             onPress={() => {
                                 setShowSuccessModal(false);
-                                router.replace('/');  // home pe bhejo
+                                router.replace('/');
                             }}
                             style={{
                                 backgroundColor: '#FF5252',

@@ -8,6 +8,7 @@ import {
   GAMBannerAd
 } from 'react-native-google-mobile-ads';
 import { useTheme } from '../contexts/ThemeContext';
+import { useScreenTracking } from '../hooks/useScreenTracking';
 import AdsManager from '../services/adsManager';
 
 export default function ThemeMode() {
@@ -16,6 +17,7 @@ export default function ThemeMode() {
   const { theme, setTheme, colors } = useTheme();
   const { t } = useTranslation();
   const systemColorScheme = useColorScheme();
+  useScreenTracking('theme_mode_screen');
 
   const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
     setTheme(newTheme); 
@@ -139,14 +141,12 @@ export default function ThemeMode() {
             {theme === 'dark' && <Text style={styles.checkmark}>✓</Text>}
           </View>
         </TouchableOpacity>
-
       </View>
-
       {bannerConfig?.show && (
         <View style={styles.stickyAdContainer}>
           <GAMBannerAd
             unitId={bannerConfig.id}
-            sizes={[BannerAdSize.BANNER]}
+            sizes={[BannerAdSize.ANCHORED_ADAPTIVE_BANNER]}
             requestOptions={{ requestNonPersonalizedAdsOnly: true }}
           />
         </View>
