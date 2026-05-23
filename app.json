@@ -2,7 +2,7 @@
   "expo": {
     "name": "Smart Calendar 2026",
     "slug": "calendarapp",
-    "version": "1.0.18",
+    "version": "1.0.20",
     "orientation": "portrait",
     "icon": "./assets/icons/logo.png",
     "owner": "epick123",
@@ -12,17 +12,18 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.hevin.calendar2026",
       "googleServicesFile": "./ios/GoogleService-Info.plist",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSPhotoLibraryUsageDescription": "Used to attach photos to calendar events.",
         "NSPhotoLibraryAddUsageDescription": "Used to save event images to your photo library.",
         "NSCameraUsageDescription": "Used to take photos and attach them to calendar events.",
-        "NSMicrophoneUsageDescription": "Used to record voice notes for calendar events.",
         "NSCalendarsUsageDescription": "Used to sync events with your device calendar.",
         "NSRemindersUsageDescription": "Used to create reminders for calendar events.",
         "NSLocationWhenInUseUsageDescription": "Used to show location details for calendar events.",
-        "NSContactsUsageDescription": "Used to invite contacts to calendar events."
+        "NSContactsUsageDescription": "Used to invite contacts to calendar events.",
+        "NSSpeechRecognitionUsageDescription": "This app uses speech recognition to help you create calendar events using your voice.",
+        "NSMicrophoneUsageDescription": "This app uses the microphone to record your voice for speech recognition when creating events.",
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to attach images to your calendar events."
       }
     },
     "android": {
@@ -83,8 +84,7 @@
       "@sentry/react-native",
       "expo-font",
       "expo-image",
-      "expo-web-browser",
-      "expo-speech-recognition"
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

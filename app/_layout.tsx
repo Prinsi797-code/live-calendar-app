@@ -401,7 +401,7 @@ function DrawerNavigator() {
       try {
         await initAnalytics();
         await trackAppOpen();
-        
+
         await PurchaseManager.initialize();
         const premiumStatus = await PurchaseManager.checkAndRestorePremium();
 
