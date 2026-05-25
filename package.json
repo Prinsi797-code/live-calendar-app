@@ -1,7 +1,7 @@
 {
   "name": "calendarappv2",
   "main": "expo-router/entry",
-  "version": "1.0.20",
+  "version": "1.0.22",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
@@ -24,6 +24,7 @@
     "@sentry/react-native": "~7.11.0",
     "expo": "~55.0.26",
     "expo-blur": "~55.0.14",
+    "expo-build-properties": "~55.0.14",
     "expo-constants": "~55.0.16",
     "expo-dev-client": "~55.0.35",
     "expo-device": "~55.0.17",

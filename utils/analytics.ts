@@ -1,89 +1,96 @@
-// utils/analytics.ts
-import analytics from '@react-native-firebase/analytics';
-import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-export async function initAnalytics() {
+const MEASUREMENT_ID = 'G-PSLGEMZW9G';
+const API_SECRET = 'Vh7oJAi1T8yaMJA6N3bytw';
+const CLIENT_ID_KEY = 'analytics_client_id';
+
+async function getClientId(): Promise<string> {
   try {
-    await analytics().setAnalyticsCollectionEnabled(true);
-    await analytics().setUserProperties({
-      app_version: Constants.expoConfig?.version ?? '1.0.0',
-      platform: Platform.OS,
-    });
-  } catch (e) {
-    if (__DEV__) console.log('Analytics init error:', e);
+    let clientId = await AsyncStorage.getItem(CLIENT_ID_KEY);
+    if (!clientId) {
+      clientId = `${Platform.OS}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      await AsyncStorage.setItem(CLIENT_ID_KEY, clientId);
+    }
+    return clientId;
+  } catch {
+    return `${Platform.OS}-${Date.now()}`;
   }
 }
 
-export async function trackScreen(screenName: string) {
+async function sendEvent(eventName: string, params: Record<string, any> = {}) {
   try {
-    await analytics().logScreenView({
-      screen_name: screenName,
-      screen_class: screenName,
+    const clientId = await getClientId();
+    const url = `https://www.google-analytics.com/mp/collect?measurement_id=${MEASUREMENT_ID}&api_secret=${API_SECRET}`;
+
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: clientId,
+        events: [{
+          name: eventName,
+          params: {
+            ...params,
+            platform: Platform.OS,
+            engagement_time_msec: '100',
+            session_id: Date.now().toString(),
+          },
+        }],
+      }),
     });
-    if (__DEV__) console.log(`📊 Screen: ${screenName}`);
-  } catch (e) {}
+
+    if (__DEV__) console.log(`📊 Analytics: ${eventName}`, params);
+  } catch (error) {
+    if (__DEV__) console.log('Analytics error:', error);
+  }
+}
+
+export async function initAnalytics() {
+  console.log('✅ Analytics ready (HTTP mode)');
+  await sendEvent('app_initialized', { timestamp: Date.now().toString() });
+}
+
+export async function trackScreen(screenName: string) {
+  await sendEvent('screen_view', {
+    firebase_screen: screenName,
+    firebase_screen_class: screenName,
+  });
+  if (__DEV__) console.log(`📊 Screen: ${screenName}`);
 }
 
 export async function trackEvent(
   eventName: string,
   params?: Record<string, string | number | boolean>
 ) {
-  try {
-    await analytics().logEvent(eventName, params ?? {});
-    if (__DEV__) console.log(`📊 Event: ${eventName}`, params);
-  } catch (e) {}
+  await sendEvent(eventName, params ?? {});
+  if (__DEV__) console.log(`📊 Event: ${eventName}`, params);
 }
 
 export async function trackAdShown(adType: string, screenName: string) {
-  try {
-    await analytics().logEvent('ad_impression', {
-      ad_format: adType,
-      screen_name: screenName,
-    });
-  } catch (e) {}
+  await sendEvent('ad_impression', { ad_format: adType, screen_name: screenName });
 }
 
 export async function trackAdFailed(adType: string, screenName: string) {
-  try {
-    await analytics().logEvent('ad_failed', {
-      ad_type: adType,
-      screen_name: screenName,
-    });
-  } catch (e) {}
+  await sendEvent('ad_failed', { ad_type: adType, screen_name: screenName });
 }
 
 export async function trackAdSkipped(reason: string, screenName: string) {
-  try {
-    await analytics().logEvent('ad_skipped', {
-      reason,
-      screen_name: screenName,
-    });
-  } catch (e) {}
+  await sendEvent('ad_skipped', { reason, screen_name: screenName });
 }
 
-export async function trackError(
-  errorMessage: string,
-  screenName: string,
-  fatal: boolean = false
-) {
-  try {
-    await analytics().logEvent('app_error', {
-      error_message: errorMessage.substring(0, 100),
-      screen_name: screenName,
-      is_fatal: fatal ? 1 : 0,
-    });
-  } catch (e) {}
+export async function trackError(errorMessage: string, screenName: string, fatal: boolean = false) {
+  await sendEvent('app_error', {
+    error_message: errorMessage.substring(0, 100),
+    screen_name: screenName,
+    is_fatal: fatal ? 1 : 0,
+  });
 }
 
 export async function trackUserProperty(properties: Record<string, string>) {
-  try {
-    await analytics().setUserProperties(properties);
-  } catch (e) {}
+  await sendEvent('user_properties', properties);
 }
 
 export async function trackAppOpen() {
-  try {
-    await analytics().logAppOpen();
-  } catch (e) {}
+  await sendEvent('app_open', { source: 'direct' });
 }

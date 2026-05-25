@@ -619,7 +619,7 @@ export default function YearView() {
                     </ScrollView>
                 </Animated.View>
             </View>
-            <View style={{ position: "absolute", right: 16, bottom: 80 }}>
+            <View style={{ position: "absolute", right: 30, bottom: 170 }}>
                 <Animated.View
                     style={[
                         styles.pulseRing,
@@ -635,6 +635,22 @@ export default function YearView() {
                     <Text style={styles.fabText}>+</Text>
                 </TouchableOpacity>
             </View>
+            {/* <View style={{ position: "absolute", right: 16, bottom: 80 }}>
+                <Animated.View
+                    style={[
+                        styles.pulseRing,
+                        pulseStyle,
+                        { backgroundColor: colors.primary },
+                    ]}
+                />
+                <TouchableOpacity
+                    style={[styles.fab, { backgroundColor: colors.primary }]}
+                    onPress={() => router.push("/addEvent")}
+                    activeOpacity={0.8}
+                >
+                    <Text style={styles.fabText}>+</Text>
+                </TouchableOpacity>
+            </View> */}
         </View>
     );
 }
@@ -667,21 +683,21 @@ const styles = StyleSheet.create({
         borderRadius: 28,
         justifyContent: "center",
         alignItems: "center",
-        elevation: 4,
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.25,
         shadowRadius: 4,
+    },
+    fabText: {
+        fontSize: 40,
+        color: '#FFFFFF',
+        justifyContent: "center",
+        fontWeight: '300',
     },
     leftContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
-    },
-    fabText: {
-        fontSize: 40,
-        color: '#FFFFFF',
-        fontWeight: '300',
     },
     menuButton: {
         padding: 8,

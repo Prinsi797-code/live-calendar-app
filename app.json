@@ -2,16 +2,16 @@
   "expo": {
     "name": "Smart Calendar 2026",
     "slug": "calendarapp",
-    "version": "1.0.20",
+    "version": "1.0.22",
     "orientation": "portrait",
     "icon": "./assets/icons/logo.png",
-    "owner": "epick123",
+    "owner": "docflow789",
     "scheme": "calendarapp",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.hevin.calendar2026",
-      "googleServicesFile": "./ios/GoogleService-Info.plist",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "buildNumber": "2",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -21,8 +21,8 @@
         "NSRemindersUsageDescription": "Used to create reminders for calendar events.",
         "NSLocationWhenInUseUsageDescription": "Used to show location details for calendar events.",
         "NSContactsUsageDescription": "Used to invite contacts to calendar events.",
-        "NSSpeechRecognitionUsageDescription": "This app uses speech recognition to help you create calendar events using your voice.",
-        "NSMicrophoneUsageDescription": "This app uses the microphone to record your voice for speech recognition when creating events.",
+        "NSSpeechRecognitionUsageDescription": "Allow speech recognition for voice search.",
+        "NSMicrophoneUsageDescription": "Allow access to microphone for voice search.",
         "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to attach images to your calendar events."
       }
     },
@@ -34,13 +34,25 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.hevin.calendar2026"
+      "package": "com.hevin.calendar2026",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
       "favicon": "./assets/icons/logo.png"
     },
     "plugins": [
+      "@react-native-firebase/app",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
       "expo-router",
       "expo-notifications",
       [
@@ -93,7 +105,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "65da0ba9-2c6c-4136-87c8-03a340efc559"
+        "projectId": "1d34b8c7-b419-4f51-a68c-54673373118a"
       }
     }
   }

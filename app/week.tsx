@@ -550,6 +550,31 @@ export default function WeekScreen() {
             </ScrollView>
 
             {/* ── FAB ── */}
+            {/* <View style={{ position: "absolute", right: 30, bottom: 170 }}>
+                <Animated.View
+                    style={[
+                        styles.pulseRing,
+                        pulseStyle,
+                        { backgroundColor: colors.primary },
+                    ]}
+                />
+                <TouchableOpacity
+                    style={[styles.fab, { backgroundColor: colors.primary }]}
+                    onPress={() => {
+                        const dateToPass = selectedDate || getLocalDateString();
+                        router.push({
+                            pathname: "/addEvent",
+                            params: {
+                                selectedDate: dateToPass
+                            }
+                        });
+                    }}
+                    activeOpacity={0.8}
+                >
+                    <Text style={styles.fabText}>+</Text>
+                </TouchableOpacity>
+            </View> */}
+
             <View style={{ position: "absolute", right: 30, bottom: 170 }}>
                 <Animated.View
                     style={[
@@ -574,6 +599,7 @@ export default function WeekScreen() {
                     <Text style={styles.fabText}>+</Text>
                 </TouchableOpacity>
             </View>
+
         </View>
     );
 }
