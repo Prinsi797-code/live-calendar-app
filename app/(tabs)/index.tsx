@@ -790,7 +790,6 @@ export default function CalendarScreen({ navigation }: any) {
       }
     });
 
-    // Add holiday dots (red dots for holidays)
     holidays.forEach((h) => {
       if (!marked[h.date]) {
         marked[h.date] = { marked: true, dots: [{ color: "#FF5252" }] };
@@ -959,7 +958,7 @@ export default function CalendarScreen({ navigation }: any) {
             const totalRowsHeight = h - headerAndDayNames;
             const oneRowHeight = totalRowsHeight / 6;
 
-            rowHeightRef.current = oneRowHeight; // ← store karo
+            rowHeightRef.current = oneRowHeight;
 
             const collapsed = Math.ceil(headerAndDayNames + oneRowHeight + 4);
             setDynamicCollapsedHeight(collapsed);
@@ -1234,7 +1233,6 @@ export default function CalendarScreen({ navigation }: any) {
           ]}
         />
         <TouchableOpacity
-          style={[styles.fab, { backgroundColor: colors.primary }]}
           onPress={() => {
             const dateToPass = selectedDate || getLocalDateString();
             router.push({
@@ -1246,7 +1244,11 @@ export default function CalendarScreen({ navigation }: any) {
           }}
           activeOpacity={0.8}
         >
-          <Text style={styles.fabText}>+</Text>
+          <Image
+            source={require("../../assets/flags/plus1.png")}
+            style={{ width: 55, height: 55 }}
+            resizeMode="contain"
+          />
         </TouchableOpacity>
       </View>
     </View >
@@ -1345,8 +1347,8 @@ const styles = StyleSheet.create({
     borderRadius: 28,
   },
   fab: {
-    width: 56,
-    height: 56,
+    width: 40,
+    height: 40,
     borderRadius: 28,
     justifyContent: "center",
     alignItems: "center",

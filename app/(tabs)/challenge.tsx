@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import {
   Alert,
   Animated,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -35,7 +36,7 @@ export default function ChallengeScreen() {
   const { theme, colors } = useTheme();
   const today = new Date();
   const formattedDate = today.toLocaleDateString('en-GB');
-  const params = useLocalSearchParams(); 
+  const params = useLocalSearchParams();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -361,9 +362,11 @@ export default function ChallengeScreen() {
             onPress={() => router.push('/challenge/create')}
             activeOpacity={0.8}
           >
-            <View style={styles.fabTextWrapper}>
-              <Text style={styles.fabText}>+</Text>
-            </View>
+            <Image
+              source={require("../../assets/flags/plus1.png")}
+              style={{ width: 55, height: 55 }}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
         </View>
       )}

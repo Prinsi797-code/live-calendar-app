@@ -47,7 +47,6 @@ export default function Holidays() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isListening, setIsListening] = useState(false);
 
-  // MAIN FIX: Initialize as null to prevent premature loading
   const [selectedCountries, setSelectedCountries] = useState<string[] | null>(null);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +61,6 @@ export default function Holidays() {
     position: string;
   } | null>(null);
 
-  // Speech events
   useSpeechRecognitionEvent('result', (event) => {
     const transcript = event.results[0]?.transcript || '';
     setSearchQuery(transcript);
@@ -318,16 +316,13 @@ export default function Holidays() {
               }
             }
           }
-
           console.log(`Cleaned up ${cancelledCount} old notifications`);
           await AsyncStorage.setItem('last_notification_cleanup', nowMs.toString());
         } else {
           console.log('Skipping cleanup - already done today');
         }
-
         for (const country of selectedCountries) {
           console.log(`Processing country: ${country}`);
-
           const calendarId = COUNTRY_CALENDAR_IDS[country];
 
           if (!calendarId) {
@@ -335,9 +330,7 @@ export default function Holidays() {
             console.log('Available calendar IDs:', Object.keys(COUNTRY_CALENDAR_IDS));
             continue;
           }
-
           console.log(`Calendar ID found for ${country}: ${calendarId}`);
-
           const needsFetch = await shouldFetchCountry(country, currentYear);
 
           if (!needsFetch) {
@@ -384,21 +377,18 @@ export default function Holidays() {
                   console.error(`Error scheduling cached ${holiday.name}:`, error);
                 }
               }
-
               if (scheduledCount > 0) {
                 console.log(`Scheduled ${scheduledCount} new notifications for ${country}`);
               }
               if (skippedCount > 0) {
                 console.log(`Skipped ${skippedCount} already scheduled for ${country}`);
               }
-
               console.log(`Finished processing ${country} from cache`);
               continue;
             } else {
               console.log(`No cached holidays found for ${country}, will fetch from API`);
             }
           }
-
           console.log(`Fetching ${country} holidays from API for year ${currentYear}...`);
           const encodedCalendarId = encodeURIComponent(calendarId);
           const API_URL =
@@ -419,10 +409,8 @@ export default function Holidays() {
               console.error(`API Error for ${country}:`, data.error);
               continue;
             }
-
             if (data.items && data.items.length > 0) {
               console.log(`Found ${data.items.length} holidays for ${country} in ${currentYear}`);
-
               const formatted = data.items.map((item: any) => ({
                 date: formatDate(item.start.date, i18n.language),
                 name: item.summary,
@@ -449,14 +437,11 @@ export default function Holidays() {
                   if (!year || !month || !day || year !== currentYear) {
                     continue;
                   }
-
                   const festivalDate = new Date(year, month - 1, day, 0, 1, 0, 0);
                   const festivalTimeMs = festivalDate.getTime();
-
                   if (festivalTimeMs - nowMs > 120000) {
                     const festivalId = `festival_${item.id}_${country}`;
                     const existingNotifId = await AsyncStorage.getItem(`festival_${festivalId}_notif`);
-
                     if (!existingNotifId) {
                       const notificationId = await NotificationService.scheduleFestivalNotification(
                         festivalId,
@@ -464,7 +449,6 @@ export default function Holidays() {
                         item.start.date,
                         country
                       );
-
                       if (notificationId) {
                         scheduledCount++;
                       }
@@ -476,7 +460,6 @@ export default function Holidays() {
                   console.error(`Error scheduling ${item.summary}:`, error);
                 }
               }
-
               if (scheduledCount > 0) {
                 console.log(`Scheduled ${scheduledCount} new festival notifications for ${country}`);
               }
@@ -486,23 +469,18 @@ export default function Holidays() {
             } else {
               console.log(`No holidays found in API response for ${country}`);
             }
-
             console.log(`Finished processing ${country} from API`);
           } catch (error) {
             console.error(`Error fetching holidays for ${country}:`, error);
           }
         }
-
         console.log(`\n📊 Total holidays collected from all countries: ${allHolidaysData.length}`);
-
         allHolidaysData.sort((a, b) => {
           const dateA = new Date(a.rawDate).getTime();
           const dateB = new Date(b.rawDate).getTime();
           return dateA - dateB;
         });
-
         setHolidays(allHolidaysData);
-
         if (allHolidaysData.length === 0) {
           setError(`No holidays found for ${currentYear}`);
         } else {
@@ -518,40 +496,19 @@ export default function Holidays() {
 
     fetchAllHolidays();
   }, [selectedCountries, i18n.language, currentYear]);
-
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* <View style={[styles.header, { backgroundColor: colors.background }]}> */}
-      {/* <View style={styles.headerLeft}> */}
-      {/* <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-            <Text style={[styles.backIcon, { color: colors.textPrimary }]}>←</Text>
-          </TouchableOpacity> */}
-      {/* <TouchableOpacity onPress={handleBackPress} style={styles.closeBtn} activeOpacity={0.7}>
-              <View style={[styles.closeBtnCircle, { backgroundColor: colors.cardBackground }]}>
-                <Text style={[styles.closeBtnX, { color: colors.textPrimary }]}>✕</Text>
-              </View>
-            </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-            {t("holiday")} {currentYear}
-          </Text> */}
-      {/* </View> */}
-      {/* </View> */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         {!isSearching ? (
           <>
-            {/* Normal header */}
             <TouchableOpacity onPress={handleBackPress} style={styles.closeBtn} activeOpacity={0.7}>
               <View style={[styles.closeBtnCircle, { backgroundColor: colors.cardBackground }]}>
                 <Ionicons name="chevron-back" size={28} color={colors.textSecondary} />
               </View>
             </TouchableOpacity>
-
             <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
               {t("holiday")} {currentYear}
             </Text>
-
-            {/* Search icon right side */}
             <TouchableOpacity
               onPress={() => setIsSearching(true)}
               style={[styles.closeBtnCircle, { backgroundColor: colors.cardBackground }]}
@@ -561,15 +518,10 @@ export default function Holidays() {
           </>
         ) : (
           <>
-            {/* Search mode header */}
             <TouchableOpacity onPress={closeSearch}>
               <Feather name="x" size={26} color={colors.textPrimary} />
             </TouchableOpacity>
-
-            {/* Input + Voice pill */}
             <View style={{ flex: 1, marginHorizontal: 10, position: 'relative', justifyContent: 'center' }}>
-
-              {/* 🔴 iOS voice pill */}
               {isListening && (
                 <View style={styles.voicePill}>
                   <Ionicons name="mic" size={13} color="#fff" />
@@ -593,8 +545,6 @@ export default function Holidays() {
                   paddingRight: 40,
                 }]}
               />
-
-              {/* Right: X ya Mic */}
               <TouchableOpacity
                 onPress={searchQuery.length > 0
                   ? () => setSearchQuery('')
@@ -646,7 +596,6 @@ export default function Holidays() {
           ))}
         </ScrollView>
       )}
-
       {bannerConfig?.show && (
         <View style={styles.stickyAdContainer}>
           <GAMBannerAd

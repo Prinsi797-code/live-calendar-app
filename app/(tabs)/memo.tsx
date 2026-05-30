@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import {
   Alert,
   Animated,
+  Image,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -419,9 +420,11 @@ export default function MemoScreen() {
               onPress={() => router.push(`/memo/new?timestamp=${Date.now()}`)}
               activeOpacity={0.8}
             >
-              <View style={styles.fabTextWrapper}>
-                <Text style={styles.fabText}>+</Text>
-              </View>
+              <Image
+                source={require("../../assets/flags/plus1.png")}
+                style={{ width: 55, height: 55 }}
+                resizeMode="contain"
+              />
             </TouchableOpacity>
           </View>
         </SafeAreaView>

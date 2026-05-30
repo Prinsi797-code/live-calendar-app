@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import {
   Alert,
   Animated,
+  Image,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -13,7 +14,7 @@ import {
   Text,
   ToastAndroid,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useScreenTracking } from '../../hooks/useScreenTracking';
@@ -411,9 +412,11 @@ export default function DiaryScreen() {
               onPress={() => router.push('/diary/new')}
               activeOpacity={0.8}
             >
-              <View style={styles.fabTextWrapper}>
-                <Text style={styles.fabText}>+</Text>
-              </View>
+              <Image
+                source={require("../../assets/flags/plus1.png")}
+                style={{ width: 55, height: 55 }}
+                resizeMode="contain"
+              />
             </TouchableOpacity>
           </View>
         </SafeAreaView>

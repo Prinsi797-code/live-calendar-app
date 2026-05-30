@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Application from 'expo-application';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
@@ -160,6 +161,85 @@ class NotificationService {
     console.log('Memo notification scheduled:', notificationId);
     return notificationId;
   }
+
+  private isNewerVersion(current: string, latest: string): boolean {
+    const curr = current.split('.').map(Number);
+    const late = latest.split('.').map(Number);
+    for (let i = 0; i < 3; i++) {
+      if ((late[i] ?? 0) > (curr[i] ?? 0)) return true;
+      if ((late[i] ?? 0) < (curr[i] ?? 0)) return false;
+    }
+    return false;
+  }
+
+  async checkAppStoreUpdate() {
+    try {
+      console.log('appstoredev');
+      if (__DEV__) return;
+      const bundleId = Application.applicationId;
+      const currentVersion = Application.nativeApplicationVersion;
+
+      if (!bundleId || !currentVersion) return;
+
+      const res = await fetch(
+        `https://itunes.apple.com/lookup?bundleId=${bundleId}`
+      );
+      const data = await res.json();
+      console.log('🍎 iTunes API Full Response:', JSON.stringify(data, null, 2));
+      console.log('🍎 Results count:', data.resultCount);
+      console.log('🍎 App Store ID:', data.results?.[0]?.trackId);
+      console.log('🍎 Latest version:', data.results?.[0]?.version);
+
+      const latestVersion: string | null = data.results?.[0]?.version ?? null;
+      const appStoreId: string | null = data.results?.[0]?.trackId?.toString() ?? null;
+
+      if (!latestVersion) {
+        console.log('Could not fetch App Store version');
+        return;
+      }
+
+      console.log('📱 Current version:', currentVersion);
+      console.log('🍎 App Store version:', latestVersion);
+
+      const alreadyNotified = await AsyncStorage.getItem(
+        `update_notified_${latestVersion}`
+      );
+      if (alreadyNotified === 'true') {
+        console.log('Already notified for version:', latestVersion);
+        return;
+      }
+
+      if (this.isNewerVersion(currentVersion, latestVersion)) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '🎉 New Update Available!',
+            body: `Version ${latestVersion} is now on App Store. Tap to update!`,
+            data: {
+              type: 'app_store_update',
+              latestVersion,
+              currentVersion,
+              appStoreId,
+            },
+            sound: 'default',
+            badge: 1,
+          },
+          trigger: null,
+        });
+
+        await AsyncStorage.setItem(
+          `update_notified_${latestVersion}`,
+          'true'
+        );
+
+        console.log('App Store update notification sent!');
+      } else {
+        console.log('App is up to date');
+      }
+    } catch (error) {
+      console.error('Error checking App Store update:', error);
+    }
+  }
+
 
   async scheduleChallengeNotification(
     challengeId: string,

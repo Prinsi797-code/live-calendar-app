@@ -2,6 +2,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DrawerActions } from '@react-navigation/native';
 import * as Sentry from '@sentry/react-native';
+import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
 import { useNavigation, useRouter } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
@@ -69,6 +70,7 @@ function SplashScreen({ onComplete, skipAd = false }: { onComplete: () => void; 
   useEffect(() => {
     const setupNotifications = async () => {
       const hasPermission = await NotificationService.requestPermissions();
+      const updateNotification = await NotificationService.checkAppStoreUpdate();
       if (hasPermission) {
         await NotificationService.scheduleDailyNotifications();
       }
@@ -401,7 +403,7 @@ function DrawerNavigator() {
       try {
         await initAnalytics();
         await trackAppOpen();
-        
+
         await PurchaseManager.initialize();
         const premiumStatus = await PurchaseManager.checkAndRestorePremium();
 
@@ -562,6 +564,24 @@ function DrawerNavigator() {
     };
 
     const subscription = NotificationService.setupNotificationListeners(handleNotificationResponse);
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    const subscription = NotificationService.setupNotificationListeners(
+      async (response) => {
+        const data = response.notification.request.content.data;
+        console.log('app store',data);
+
+        if (data?.type === 'app_store_update') {
+          const appStoreId = data.appStoreId;
+
+          const url = `https://apps.apple.com/app/id${appStoreId}`;
+          await Linking.openURL(url);
+        }
+      }
+    );
+
     return () => subscription.remove();
   }, []);
 

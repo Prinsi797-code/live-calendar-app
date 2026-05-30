@@ -5,7 +5,7 @@ import { DrawerActions } from '@react-navigation/native';
 import { useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Animated, Dimensions, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, Image, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useScreenTracking } from '../hooks/useScreenTracking';
 
@@ -619,23 +619,7 @@ export default function YearView() {
                     </ScrollView>
                 </Animated.View>
             </View>
-            <View style={{ position: "absolute", right: 30, bottom: 170 }}>
-                <Animated.View
-                    style={[
-                        styles.pulseRing,
-                        pulseStyle,
-                        { backgroundColor: colors.primary },
-                    ]}
-                />
-                <TouchableOpacity
-                    style={[styles.fab, { backgroundColor: colors.primary }]}
-                    onPress={() => router.push("/addEvent")}
-                    activeOpacity={0.8}
-                >
-                    <Text style={styles.fabText}>+</Text>
-                </TouchableOpacity>
-            </View>
-            {/* <View style={{ position: "absolute", right: 16, bottom: 80 }}>
+            {/* <View style={{ position: "absolute", right: 30, bottom: 170 }}>
                 <Animated.View
                     style={[
                         styles.pulseRing,
@@ -651,6 +635,32 @@ export default function YearView() {
                     <Text style={styles.fabText}>+</Text>
                 </TouchableOpacity>
             </View> */}
+
+
+            <View style={{ position: "absolute", right: 30, bottom: 170 }}>
+                <Animated.View
+                    style={[
+                        styles.pulseRing,
+                        pulseStyle,
+                        { backgroundColor: colors.primary },
+                    ]}
+                />
+                <TouchableOpacity
+                    // style={[styles.fab, { backgroundColor: colors.white }]}
+                    onPress={() => {
+                        router.push({
+                            pathname: "/addEvent",
+                        });
+                    }}
+                    activeOpacity={0.8}
+                >
+                    <Image
+                        source={require("../assets/flags/plus1.png")}
+                        style={{ width: 55, height: 55 }}
+                        resizeMode="contain"
+                    />
+                </TouchableOpacity>
+            </View>
         </View>
     );
 }

@@ -236,6 +236,25 @@ export default function WeekScreen() {
         }
     };
 
+    useEffect(() => {
+        const pulse = Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulseAnim, {
+                    toValue: 1,
+                    duration: 900,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(pulseAnim, {
+                    toValue: 0,
+                    duration: 900,
+                    useNativeDriver: true,
+                }),
+            ])
+        );
+        pulse.start();
+        return () => pulse.stop();
+    }, []);
+    
     const pulseStyle = {
         transform: [
             {
@@ -550,31 +569,6 @@ export default function WeekScreen() {
             </ScrollView>
 
             {/* ── FAB ── */}
-            {/* <View style={{ position: "absolute", right: 30, bottom: 170 }}>
-                <Animated.View
-                    style={[
-                        styles.pulseRing,
-                        pulseStyle,
-                        { backgroundColor: colors.primary },
-                    ]}
-                />
-                <TouchableOpacity
-                    style={[styles.fab, { backgroundColor: colors.primary }]}
-                    onPress={() => {
-                        const dateToPass = selectedDate || getLocalDateString();
-                        router.push({
-                            pathname: "/addEvent",
-                            params: {
-                                selectedDate: dateToPass
-                            }
-                        });
-                    }}
-                    activeOpacity={0.8}
-                >
-                    <Text style={styles.fabText}>+</Text>
-                </TouchableOpacity>
-            </View> */}
-
             <View style={{ position: "absolute", right: 30, bottom: 170 }}>
                 <Animated.View
                     style={[
@@ -584,7 +578,6 @@ export default function WeekScreen() {
                     ]}
                 />
                 <TouchableOpacity
-                    style={[styles.fab, { backgroundColor: colors.primary }]}
                     onPress={() => {
                         const dateToPass = selectedDate || getLocalDateString();
                         router.push({
@@ -596,7 +589,11 @@ export default function WeekScreen() {
                     }}
                     activeOpacity={0.8}
                 >
-                    <Text style={styles.fabText}>+</Text>
+                    <Image
+                        source={require("../assets/flags/plus1.png")}
+                        style={{ width: 55, height: 55 }}
+                        resizeMode="contain"
+                    />
                 </TouchableOpacity>
             </View>
 

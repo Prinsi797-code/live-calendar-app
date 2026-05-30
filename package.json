@@ -23,6 +23,7 @@
     "@react-navigation/native": "^7.1.8",
     "@sentry/react-native": "~7.11.0",
     "expo": "~55.0.26",
+    "expo-application": "~55.0.15",
     "expo-blur": "~55.0.14",
     "expo-build-properties": "~55.0.14",
     "expo-constants": "~55.0.16",
