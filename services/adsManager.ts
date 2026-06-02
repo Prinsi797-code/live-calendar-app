@@ -3,7 +3,7 @@ import {
   AdEventType,
   AppOpenAd,
   InterstitialAd,
-  TestIds,
+  TestIds
 } from 'react-native-google-mobile-ads';
 import { trackAdShown } from '../utils/analytics';
 import { fetchAppConfig } from '../utils/firebaseConfig';
@@ -32,6 +32,11 @@ interface AdConfig {
     ad_flag: number;
     baner_id: string;
   };
+
+  custom_theme?: {
+    reward_ad_flag: number;
+    reward_id: string;
+  }
 
   setting_screen?: {
     ad_flag: number;
@@ -74,8 +79,9 @@ class AdsManager {
   private isEventInterstitialLoaded = false;
   private mainScreenInterstitialAd: InterstitialAd | null = null;
   private isMainScreenInterstitialLoaded = false;
-  private static skipNextMainScreenAd = false; // notification open ke liye
-
+  private static skipNextMainScreenAd = false;
+  private rewardedAd: any | null = null;
+  private isRewardedAdLoaded = false;
 
   // Ad frequency tracking keys
   private readonly SPLASH_AD_SHOWN_KEY = 'splash_ad_shown';
@@ -104,6 +110,97 @@ class AdsManager {
       AdsManager.instance = new AdsManager();
     }
     return AdsManager.instance;
+  }
+
+  async loadRewardedAd() {
+    const rewardConfig = this.config?.custom_theme;
+    console.log('🎯 Reward config:', JSON.stringify(rewardConfig));
+
+    if (!rewardConfig || rewardConfig.reward_ad_flag !== 1 || !rewardConfig.reward_id?.trim()) {
+      console.log('Rewarded ad not configured');
+      return;
+    }
+    try {
+      const { RewardedAd, RewardedAdEventType } = await import('react-native-google-mobile-ads');
+      const adUnitId = this.getAdUnitId(rewardConfig.reward_id);
+      console.log('🎯 Loading rewarded ad with ID:', adUnitId);
+
+      this.rewardedAd = RewardedAd.createForAdRequest(adUnitId, {
+        requestNonPersonalizedAdsOnly: true,
+      });
+
+      this.rewardedAd.addAdEventListener('rewarded_loaded', () => {
+        this.isRewardedAdLoaded = true;
+        console.log('✅ Rewarded Ad Loaded successfully');
+      });
+
+      this.rewardedAd.addAdEventListener('rewarded_error', (error: any) => {
+        console.log('❌ Rewarded Ad Error:', JSON.stringify(error));
+        this.isRewardedAdLoaded = false;
+      });
+      console.log('🎯 Calling rewardedAd.load()...'); 
+      this.rewardedAd.load();
+      console.log('🎯 rewardedAd.load() called');
+    } catch (error) {
+      console.log('❌ Rewarded Ad Load Failed:', error);
+    }
+  }
+
+  async showCustomThemeRewardedAd(): Promise<boolean> {
+    const rewardConfig = this.config?.custom_theme;
+
+    // Flag 0 = ads disabled, seedha apply karo
+    if (!rewardConfig || rewardConfig.reward_ad_flag === 0) {
+      console.log('Rewarded ad disabled — apply theme directly');
+      return true;
+    }
+
+    if (!this.isRewardedAdLoaded) {
+      console.log('Rewarded ad not ready, waiting...');
+      await new Promise<void>((resolve) => {
+        let attempts = 0;
+        const interval = setInterval(() => {
+          attempts++;
+          if (this.isRewardedAdLoaded) {
+            clearInterval(interval);
+            resolve();
+          } else if (attempts >= 10) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 500);
+      });
+    }
+
+    if (!this.isRewardedAdLoaded || !this.rewardedAd) {
+      console.log('Rewarded ad still not loaded — apply theme directly');
+      return true;
+    }
+
+    try {
+      const { RewardedAdEventType } = await import('react-native-google-mobile-ads');
+
+      return new Promise((resolve) => {
+        let rewarded = false;
+
+        this.rewardedAd.addAdEventListener('rewarded_earned_reward', () => {
+          console.log('User earned reward');
+          rewarded = true;
+        });
+
+        this.rewardedAd.addAdEventListener('rewarded_closed', () => {
+          console.log('Rewarded ad closed');
+          this.isRewardedAdLoaded = false;
+          setTimeout(() => this.loadRewardedAd(), 1000);
+          resolve(rewarded);
+        });
+
+        this.rewardedAd.show();
+      });
+    } catch (e) {
+      console.log('Rewarded ad show failed:', e);
+      return true; // Fail hone par bhi theme apply karo
+    }
   }
 
   // ==================== LOAD CONFIG FROM FIREBASE ====================
@@ -1113,13 +1210,10 @@ class AdsManager {
       return;
     }
     console.log('Config loaded successfully');
-    // 1. Floor interstitial (highest priority)
     await this.loadFloorInterstitialAd();
 
-    // Wait a bit to see if floor interstitial loads
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // 2. Load other interstitials only if floor is not available
     if (!this.isFloorInterstitialLoaded) {
       console.log('Floor interstitial not available, loading other interstitials');
       this.loadLanguageInterstitialAd();
@@ -1129,9 +1223,8 @@ class AdsManager {
     } else {
       console.log('Floor interstitial loaded, other interstitials will use it');
     }
+    this.loadRewardedAd();
   }
-
-  // NEW: Initialize ads WITHOUT loading floor_inter (for notification opens)
   async initializeAdsWithoutFloorInter() {
     console.log('🚀 Initializing Ads (WITHOUT floor_inter)...');
 
@@ -1144,12 +1237,12 @@ class AdsManager {
 
     console.log('Config loaded successfully');
 
-    // Skip floor_inter completely - load other interstitials directly
     console.log('Skipping floor_inter, loading screen-specific interstitials');
     this.loadLanguageInterstitialAd();
     this.loadSettingInterstitialAd();
     this.loadDetailInterstitialAd();
     this.loadEventInterstitialAd();
+    this.loadRewardedAd();
   }
 
   getConfig() {

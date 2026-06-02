@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from "react-i18next";
 import {
+    Image,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -23,18 +24,19 @@ import {
     GAMBannerAd
 } from 'react-native-google-mobile-ads';
 import { CustomToast } from '../components/CustomToast';
+import { EventTemplate, TEMPLATE_CATEGORIES, TemplateCategory } from '../constants/eventTemplates';
 import { useTheme } from '../contexts/ThemeContext';
 import { useScreenTracking } from '../hooks/useScreenTracking';
 import AdsManager from '../services/adsManager';
 import NotificationService from '../services/NotificationService';
 import PurchaseManager from '../services/purchaseManager';
 import { loadData, saveData } from '../utils/storage';
-
+import { isStreakRewardActive } from '../utils/streakManager';
 export default function EditEventScreen() {
     const router = useRouter();
     const { t } = useTranslation();
     const params = useLocalSearchParams();
-    const { colors, theme } = useTheme();
+    const { colors, theme, resolvedTheme } = useTheme();
     const [isTimeFormatLoaded, setIsTimeFormatLoaded] = useState(false);
     const [toastVisible, setToastVisible] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
@@ -45,6 +47,8 @@ export default function EditEventScreen() {
     // Add state for repeat modal
     const [showRepeatModal, setShowRepeatModal] = useState(false);
     const [tempRepeatValue, setTempRepeatValue] = useState('does_not');
+    const [showTemplateModal, setShowTemplateModal] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState<TemplateCategory | null>(null);
     useScreenTracking('edit_event_screen');
 
     // Repeat options
@@ -90,6 +94,16 @@ export default function EditEventScreen() {
     const [activeTimeField, setActiveTimeField] = useState<"start" | "end" | null>(null);
     const [tempTime, setTempTime] = useState(new Date());
     const [originalData, setOriginalData] = useState<any>(null);
+
+    const applyTemplate = (template: EventTemplate) => {
+        setFormData(prev => ({
+            ...prev,
+            title: template.title,
+            color: template.color,
+        }));
+        setShowTemplateModal(false);
+        setSelectedCategory(null);
+    };
 
     const showToast = (message: string) => {
         if (Platform.OS === 'android') {
@@ -160,6 +174,7 @@ export default function EditEventScreen() {
         repeat: 'Does not repeat',
         reminders: ['at_time'],
         color: '#0267FF',
+        bgImage: null as string | null,
     });
     const [tempReminders, setTempReminders] = useState<string[]>(['at_time']);
 
@@ -329,6 +344,7 @@ export default function EditEventScreen() {
                     repeat: params.repeat as string || 'Does not repeat',
                     reminders: params.reminders ? JSON.parse(params.reminders as string) : ['at_time'],
                     color: params.color as string || '#0267FF',
+                    bgImage: params.bgImage as string || null,
                 };
 
                 setOriginalFormData(JSON.parse(JSON.stringify(newFormData)));
@@ -557,9 +573,13 @@ export default function EditEventScreen() {
                 repeat: formData.repeat,
                 reminders: formData.reminders,
                 color: formData.color,
+                templateImageKey: getImageKey(formData.title),
+                bgImage: formData.bgImage ?? null,
             };
 
             console.log("📌 Updated Event:", updatedEvent);
+            console.log("🖼️ bgImage being saved:", formData.bgImage);
+            console.log("🖼️ bgImage in updatedEvent:", updatedEvent.bgImage);
 
             const oldNotificationIds = await AsyncStorage.getItem(
                 `event_${params.eventId}_notifications`
@@ -675,6 +695,22 @@ export default function EditEventScreen() {
         setTempReminders([...originalFormData.reminders]);
     };
 
+    const [isPremiumUser, setIsPremiumUser] = useState(false);
+    const [rewardDaysLeft, setRewardDaysLeft] = useState(0);
+
+    useEffect(() => {
+        const checkAccess = async () => {
+            const premium = await PurchaseManager.isPremium();
+            setIsPremiumUser(premium);
+            const reward = await isStreakRewardActive();
+            setRewardDaysLeft(reward.daysLeft);
+        };
+        checkAccess();
+    }, []);
+
+    const hasBgImageAccess = isPremiumUser || rewardDaysLeft > 0;
+
+
     // const handleCancel = () => {
     //     resetToOriginalValues();
     //     router.back();
@@ -702,7 +738,16 @@ export default function EditEventScreen() {
             router.back();
         }
     };
-
+    const getImageKey = (title: string): string | null => {
+        const map: { [key: string]: string } = {
+            'Client Call': 'clientcall',
+            'Project Deadline': 'deadline',
+            'Presentation': 'presentation',
+            'Interview': 'interview',
+            'Team Meeting': 'team',
+        };
+        return map[title] || null;
+    };
 
     const getRepeatDisplayText = (repeatValue: string) => {
         const mapping: { [key: string]: string } = {
@@ -719,24 +764,40 @@ export default function EditEventScreen() {
         <View style={[styles.container, { backgroundColor: colors.background }]}>
             <View style={[styles.header]}>
                 {/* <View style={styles.leftContainer}> */}
+                <TouchableOpacity
+                    onPress={handleCancel}
+                    style={styles.backButton}
+                >
+                    <View style={[styles.closeBtnCircle, { backgroundColor: colors.cardBackground }]}>
+                        {/* <Text style={[styles.closeBtnX, { color: colors.textPrimary }]}>✕</Text> */}
+                        <Ionicons name="chevron-back" size={28} color={colors.textSecondary} />
+                    </View>
+                    {/* <Text style={[styles.headerButton, { color: colors.textPrimary }]}>✕</Text> */}
+                </TouchableOpacity>
+
+                <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+                    {t("edit_event")}
+                </Text>
+                {/* </View> */}
+                {/* Header ke andar ye replace karo */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <TouchableOpacity
-                        onPress={handleCancel}
-                        style={styles.backButton}
+                        onPress={() => {
+                            setSelectedCategory(null);
+                            setShowTemplateModal(true);
+                        }}
+                        style={[styles.templateBtn, { backgroundColor: colors.cardBackground }]}
                     >
-                        <View style={[styles.closeBtnCircle, { backgroundColor: colors.cardBackground }]}>
-                            {/* <Text style={[styles.closeBtnX, { color: colors.textPrimary }]}>✕</Text> */}
-                            <Ionicons name="chevron-back" size={28} color={colors.textSecondary} />
-                        </View>
-                        {/* <Text style={[styles.headerButton, { color: colors.textPrimary }]}>✕</Text> */}
+                        <Ionicons name="grid-outline" size={18} color={colors.primary} />
+                        {/* <Text style={[styles.templateBtnText, { color: colors.primary }]}>
+                            Templates
+                        </Text> */}
                     </TouchableOpacity>
 
-                    <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-                        {t("edit_event")}
-                    </Text>
-                {/* </View> */}
-                <TouchableOpacity onPress={updateEvent}>
-                    <Text style={[styles.saveText, styles.saveButton]}>{t("update")}</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity onPress={updateEvent}>
+                        <Text style={[styles.saveText, styles.saveButton]}>{t("save")}</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <KeyboardAvoidingView
@@ -924,7 +985,130 @@ export default function EditEventScreen() {
                                 </View>
                             </TouchableOpacity>
                         </View>
+                        {/* Background Image Picker */}
+                        {/* Background Image Picker */}
+                        <View style={styles.dateColumn}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 20, marginBottom: 0 }}>
+                                <Text style={[styles.dateLabel, { color: colors.textPrimary, paddingTop: 0 }]}>
+                                    Background Image
+                                </Text>
+                                {/* Badge — reward active ho to green FREE, warna gold PRO */}
+                                {rewardDaysLeft > 0 ? (
+                                    <View style={{
+                                        backgroundColor: '#22c55e',
+                                        paddingHorizontal: 7,
+                                        paddingVertical: 2,
+                                        borderRadius: 6,
+                                    }}>
+                                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
+                                            FREE {rewardDaysLeft}d
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <View style={{
+                                        backgroundColor: '#FFD700',
+                                        paddingHorizontal: 7,
+                                        paddingVertical: 2,
+                                        borderRadius: 6,
+                                    }}>
+                                        <Text style={{ color: '#000', fontSize: 10, fontWeight: '700' }}>PRO</Text>
+                                    </View>
+                                )}
+                            </View>
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={{ gap: 10, paddingVertical: 6 }}
+                            >
+                                {/* None option */}
+                                <TouchableOpacity
+                                    onPress={async () => {
+                                        if (!hasBgImageAccess) {
+                                            router.push('/PremiumScreen');
+                                            return;
+                                        }
+                                        setFormData({ ...formData, bgImage: null });
+                                    }}
+                                    style={{
+                                        width: 70,
+                                        height: 70,
+                                        borderRadius: 10,
+                                        backgroundColor: colors.cardBackground,
+                                        borderWidth: 2,
+                                        borderColor: formData.bgImage === null ? '#FF5252' : colors.border,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <Feather name="x" size={22} color={colors.textSecondary} />
+                                    <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 3 }}>None</Text>
+                                </TouchableOpacity>
 
+                                {/* Image options */}
+                                {(() => {
+                                    const prefix = resolvedTheme === 'dark' ? 'dark' : 'light';
+                                    const images: { [key: string]: any } = {
+                                        'light': require('../assets/temp/light.jpeg'),
+                                        'light1': require('../assets/temp/light1.jpeg'),
+                                        'light2': require('../assets/temp/light2.jpeg'),
+                                        'light3': require('../assets/temp/light3.jpeg'),
+                                        'light4': require('../assets/temp/light4.jpeg'),
+                                        'light5': require('../assets/temp/light5.jpeg'),
+                                        'light6': require('../assets/temp/light6.jpeg'),
+                                        'light7': require('../assets/temp/light7.jpeg'),
+                                        'light8': require('../assets/temp/light8.jpeg'),
+                                        'dark': require('../assets/temp/dark.jpeg'),
+                                        'dark1': require('../assets/temp/dark1.jpeg'),
+                                        'dark2': require('../assets/temp/dark2.jpeg'),
+                                        'dark3': require('../assets/temp/dark3.jpeg'),
+                                        'dark4': require('../assets/temp/dark4.jpeg'),
+                                        'dark5': require('../assets/temp/dark5.jpeg'),
+                                        'dark6': require('../assets/temp/dark6.jpeg'),
+                                        'dark7': require('../assets/temp/dark7.jpeg'),
+                                        'dark8': require('../assets/temp/dark8.jpeg'),
+                                    };
+                                    const keys = [`${prefix}`, `${prefix}1`, `${prefix}2`, `${prefix}3`,
+                                    `${prefix}4`, `${prefix}5`, `${prefix}6`, `${prefix}7`, `${prefix}8`];
+
+                                    return keys.map((key) => (
+                                        <TouchableOpacity
+                                            key={key}
+                                            onPress={async () => {
+                                                if (!hasBgImageAccess) {
+                                                    router.push('/PremiumScreen');
+                                                    return;
+                                                }
+                                                setFormData({ ...formData, bgImage: key });
+                                            }}
+                                            style={{
+                                                borderRadius: 10,
+                                                overflow: 'hidden',
+                                                borderWidth: 2.5,
+                                                borderColor: formData.bgImage === key ? '#FF5252' : 'transparent',
+                                            }}
+                                        >
+                                            <Image
+                                                source={images[key]}
+                                                style={{ width: 70, height: 70 }}
+                                                resizeMode="cover"
+                                            />
+                                            {!hasBgImageAccess && (
+                                                <View style={{
+                                                    position: 'absolute',
+                                                    top: 0, left: 0, right: 0, bottom: 0,
+                                                    backgroundColor: 'rgba(0,0,0,0.45)',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    borderRadius: 8,
+                                                }}>
+                                                    <Ionicons name="lock-closed" size={20} color="#FF5252" />
+                                                </View>
+                                            )}
+                                        </TouchableOpacity>
+                                    ));
+                                })()}
+                            </ScrollView>
+                        </View>
                         {/* Note */}
                         <TextInput
                             placeholder={t("note")}
@@ -952,7 +1136,93 @@ export default function EditEventScreen() {
                 </SafeAreaView>
             </KeyboardAvoidingView>
 
+            <Modal
+                visible={showTemplateModal}
+                transparent
+                animationType="slide"
+                onRequestClose={() => {
+                    setSelectedCategory(null);
+                    setShowTemplateModal(false);
+                }}
+            >
+                <View style={tmplStyles.overlay}>
+                    <View style={[tmplStyles.sheet, { backgroundColor: colors.background }]}>
+                        <View style={tmplStyles.sheetHeader}>
+                            {selectedCategory ? (
+                                <TouchableOpacity onPress={() => setSelectedCategory(null)}>
+                                    <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+                                </TouchableOpacity>
+                            ) : (
+                                <View style={{ width: 24 }} />
+                            )}
+                            <Text style={[tmplStyles.sheetTitle, { color: colors.textPrimary }]}>
+                                {selectedCategory ? selectedCategory.name : 'Templates'}
+                            </Text>
+                            <TouchableOpacity onPress={() => {
+                                setSelectedCategory(null);
+                                setShowTemplateModal(false);
+                            }}>
+                                <Ionicons name="close" size={24} color={colors.textSecondary} />
+                            </TouchableOpacity>
+                        </View>
 
+                        {!selectedCategory ? (
+                            <ScrollView showsVerticalScrollIndicator={false}>
+                                <View style={tmplStyles.categoryGrid}>
+                                    {TEMPLATE_CATEGORIES.map(cat => (
+                                        <TouchableOpacity
+                                            key={cat.id}
+                                            style={[tmplStyles.categoryCard, {
+                                                backgroundColor: colors.cardBackground,
+                                                borderColor: cat.color + '40',
+                                                borderWidth: 1.5,
+                                            }]}
+                                            onPress={() => setSelectedCategory(cat)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={[tmplStyles.categoryIcon, { backgroundColor: cat.color + '20' }]}>
+                                                <Text style={{ fontSize: 28 }}>{cat.emoji}</Text>
+                                            </View>
+                                            <Text style={[tmplStyles.categoryName, { color: colors.textPrimary }]}>
+                                                {cat.name}
+                                            </Text>
+                                            <Text style={[tmplStyles.categoryCount, { color: colors.textTertiary }]}>
+                                                {cat.templates.length} templates
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </ScrollView>
+                        ) : (
+                            <ScrollView showsVerticalScrollIndicator={false}>
+                                {selectedCategory.templates.map(template => (
+                                    <TouchableOpacity
+                                        key={template.id}
+                                        style={[tmplStyles.templateRow, {
+                                            backgroundColor: colors.cardBackground,
+                                            borderLeftColor: template.color,
+                                        }]}
+                                        onPress={() => applyTemplate(template)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={[tmplStyles.templateEmoji, { backgroundColor: template.color + '20' }]}>
+                                            <Text style={{ fontSize: 22 }}>{template.emoji}</Text>
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={[tmplStyles.templateTitle, { color: colors.textPrimary }]}>
+                                                {template.title}
+                                            </Text>
+                                            {/* <Text style={[tmplStyles.templateReminder, { color: colors.textTertiary }]}>
+                                                🔔 Reminder: {template.reminder.replace(/_/g, ' ')}
+                                            </Text> */}
+                                        </View>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        )}
+                    </View>
+                </View>
+            </Modal>
             {/* REPEAT MODAL - NEW POPUP */}
             <Modal visible={showRepeatModal} transparent animationType="fade">
                 <View style={styles.centeredModalContainer}>
@@ -1267,7 +1537,82 @@ export default function EditEventScreen() {
         </View>
     );
 }
-
+const tmplStyles = StyleSheet.create({
+    overlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    sheet: {
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 20,
+        maxHeight: '80%',
+        minHeight: '50%',
+    },
+    sheetHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 20,
+    },
+    sheetTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    categoryGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+        paddingBottom: 30,
+    },
+    categoryCard: {
+        width: '47%',
+        borderRadius: 16,
+        padding: 16,
+        alignItems: 'center',
+        gap: 8,
+    },
+    categoryIcon: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    categoryName: {
+        fontSize: 13,
+        fontWeight: '600',
+        textAlign: 'center',
+    },
+    categoryCount: {
+        fontSize: 11,
+    },
+    templateRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 10,
+        borderLeftWidth: 4,
+        gap: 12,
+    },
+    templateEmoji: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    templateTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        marginBottom: 3,
+    },
+    templateReminder: {
+        fontSize: 12,
+    },
+});
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -1300,6 +1645,18 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 4,
+    },
+    templateBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 8,
+    },
+    templateBtnText: {
+        fontSize: 13,
+        fontWeight: '600',
     },
     modalOverlay: {
         flex: 1,

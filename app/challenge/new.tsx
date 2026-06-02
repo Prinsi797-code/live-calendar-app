@@ -33,6 +33,7 @@ import { useScreenTracking } from '../../hooks/useScreenTracking';
 import AdsManager from '../../services/adsManager';
 import NotificationService from '../../services/NotificationService';
 import PurchaseManager from '../../services/purchaseManager';
+import { isStreakRewardActive } from '../../utils/streakManager';
 
 const iconOptions = [
     '💪', '🗑️', '💣', '🎨', '☕', '🔧',
@@ -353,6 +354,24 @@ export default function NewChallengeScreen() {
         return combined;
     };
 
+    const [rewardDaysLeft, setRewardDaysLeft] = useState(0);
+
+    useEffect(() => {
+        const checkReward = async () => {
+            const reward = await isStreakRewardActive();
+            setRewardDaysLeft(reward.daysLeft);
+        };
+        checkReward();
+    }, []);
+
+    // Helper — premium ya reward dono se access milega
+    const hasChallengeAccess = async () => {
+        const isPremium = await PurchaseManager.isPremium();
+        if (isPremium) return true;
+        const reward = await isStreakRewardActive();
+        return reward.active;
+    };
+
     const handleSave = async () => {
         if (!title.trim()) {
             return showToast(t("challenge_title") || "Enter a challenge title");
@@ -377,9 +396,9 @@ export default function NewChallengeScreen() {
 
         try {
             setIsSaving(true);
-            const isPremium = await PurchaseManager.isPremium();
+            const hasAccess = await hasChallengeAccess();
 
-            if (!isPremium) {
+            if (!hasAccess) {
                 setShowPremiumModal(true);
                 setIsSaving(false);
                 return;
@@ -556,7 +575,7 @@ export default function NewChallengeScreen() {
                 return;
             }
             router.replace("/challenge/create");
-                setTimeout(async () => {
+            setTimeout(async () => {
                 await AdsManager.showEventScreenInterstitialAd('CreateChalange', 'back');
             }, 100);
 
@@ -599,14 +618,24 @@ export default function NewChallengeScreen() {
                             <ActivityIndicator size="small" color="#fff" />
                         ) : (
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-
-                                {/* Crown Icon */}
                                 <Ionicons name="diamond" size={16} color="#fff" style={{ marginRight: 6 }} />
-                                {/* <Ionicons name="crown" size={16} color="#fff" style={{ marginRight: 6 }} /> */}
-
                                 <Text style={styles.saveText}>
-                                    {isEditMode ? t('updated') : t('save')}
+                                    {isEditMode ? t('save') : t('save')}
                                 </Text>
+                                {/* Streak reward badge */}
+                                {rewardDaysLeft > 0 && (
+                                    <View style={{
+                                        backgroundColor: '#22c55e',
+                                        paddingHorizontal: 6,
+                                        paddingVertical: 2,
+                                        borderRadius: 5,
+                                        marginLeft: 6,
+                                    }}>
+                                        <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>
+                                            FREE {rewardDaysLeft}d
+                                        </Text>
+                                    </View>
+                                )}
                             </View>
                         )}
                     </TouchableOpacity>

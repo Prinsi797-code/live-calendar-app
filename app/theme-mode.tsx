@@ -49,11 +49,7 @@ export default function ThemeMode() {
     }
   };
 
-  // Helper: kaunsa option selected hai
-  const isSystemSelected = theme === 'system'; // agar ThemeContext 'system' support kare
-  // Agar nahi karta, niche wala logic use karo (comment/uncomment):
-  // const isSystemSelected = false; // tab system option visually selected nahi hoga
-
+  const isSystemSelected = theme === 'system'; 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
 

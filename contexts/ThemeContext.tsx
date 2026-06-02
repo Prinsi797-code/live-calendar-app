@@ -58,7 +58,6 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // 👇 'system' ho to device ka scheme use karo, warna jo select kiya
   const resolvedTheme: 'light' | 'dark' =
     theme === 'system'
       ? (systemColorScheme === 'dark' ? 'dark' : 'light')
@@ -96,7 +95,6 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     grey: '#b6b6b62b',
   };
 
-  // 👇 colors resolvedTheme se aayenge (actual light/dark)
   const colors = resolvedTheme === 'light' ? lightColors : darkColors;
 
   return (

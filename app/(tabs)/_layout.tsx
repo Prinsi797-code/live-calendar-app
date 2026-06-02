@@ -32,7 +32,6 @@ const TAB_ICONS: Record<string, keyof typeof Feather.glyphMap> = {
 const BANNER_HEIGHT = 65;
 const BAR_BOTTOM = 0;
 
-// ─── Animated Tab Button ──────────────────────────────────────────────────────
 function GlassTabButton({
   icon, label, isActive, onPress,
 }: {
@@ -61,7 +60,7 @@ function GlassTabButton({
     opacity: glow.value,
   }));
 
-  const inactiveColor = isDark ? 'rgba(255,255,255,0.60)' : 'rgba(0,0,0,0.50)';
+  const inactiveColor = colors.textPrimary;
   const iconColor = isActive ? colors.primary : inactiveColor;
   const labelColor = isActive ? colors.primary : inactiveColor;
 
@@ -88,12 +87,12 @@ function GlassTabButton({
   );
 }
 
-// ─── Glass Tab Bar ─────────────────────────────────────────────────────────────
 // bottomOffset = BANNER_HEIGHT when ad is showing, else 0
 function GlassTabBar({ state, navigation, descriptors, bottomOffset = 0 }: any) {
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
-  
+  const { resolvedTheme, colors } = useTheme(); // ← colors add karo
+  const isDark = resolvedTheme === 'dark' || resolvedTheme === 'custom';
+
+
   const baseColor = isDark
     ? 'rgba(18, 18, 28, 0.88)'
     : 'rgba(234, 234, 234, 0.89)';
@@ -115,12 +114,18 @@ function GlassTabBar({ state, navigation, descriptors, bottomOffset = 0 }: any) 
     : '#000';
 
   return (
-    <View style={[styles.barOuter, { bottom: bottomOffset + BAR_BOTTOM }]}>
-      <View style={[styles.glassContainer, { borderColor: borderClr, shadowColor: shadowClr }]}>
-        <View style={[styles.base, { backgroundColor: baseColor }]} />
-        <View style={[styles.sheen, { backgroundColor: sheen }]} />
-        {/* <View style={[styles.topShine, { backgroundColor: shineClr }]} /> */}
-
+    <View style={[styles.barOuter, { bottom: bottomOffset + BAR_BOTTOM, backgroundColor: 'transparent' }]}>
+      <View style={[styles.glassContainer, {
+        backgroundColor: colors.cardBackground,
+        borderRadius: 30,
+        borderColor: colors.border,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.18,
+        shadowRadius: 16,
+        elevation: 20,
+        margin: 5
+      }]}>
         <View style={styles.tabRow}>
           {state.routes.map((route: any, index: number) => {
             const { options } = descriptors[route.key];
@@ -144,7 +149,6 @@ function GlassTabBar({ state, navigation, descriptors, bottomOffset = 0 }: any) 
   );
 }
 
-// ─── Main Layout ──────────────────────────────────────────────────────────────
 export default function TabLayout() {
   const { colors } = useTheme();
   const { t, i18n, ready } = useTranslation();
@@ -234,9 +238,9 @@ export default function TabLayout() {
   const showBanner = !isPremium && bannerConfig?.show;
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, }}>
       <Tabs
-        screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}
+        screenOptions={{ headerShown: false,tabBarStyle: { display: 'none' } }}
         tabBar={(props) => (
           <GlassTabBar {...props} bottomOffset={showBanner ? BANNER_HEIGHT : 0} />
         )}
@@ -247,7 +251,6 @@ export default function TabLayout() {
         <Tabs.Screen name="diary" options={{ title: t("Diary") }} />
       </Tabs>
 
-      {/* Ad always at very bottom, glass bar floats above it */}
       {showBanner && (
         <View style={styles.stickyAdContainer}>
           <GAMBannerAd
@@ -261,7 +264,6 @@ export default function TabLayout() {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   barOuter: {
     position: 'absolute',
@@ -272,12 +274,13 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 50,
     overflow: 'hidden',
-    shadowOffset: { width: 2, height: 8 },
+    shadowOffset: { width: 10, height: 12 },
     shadowOpacity: 0.35,
     marginLeft: 10,
     marginRight: 10,
     shadowRadius: 25,
-    marginBottom: 20,
+    marginBottom: 10,
+    marginTop: 10,
     elevation: 18,
   },
   base: { ...StyleSheet.absoluteFillObject },

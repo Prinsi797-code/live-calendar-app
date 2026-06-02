@@ -5,9 +5,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from "react-i18next";
-import PurchaseManager from '../services/purchaseManager';
-
 import {
+    Image,
     Keyboard,
     KeyboardAvoidingView,
     Modal,
@@ -28,22 +27,27 @@ import {
 } from 'react-native-google-mobile-ads';
 import { CustomToast } from '../components/CustomToast';
 import { NotificationPermissionModal } from '../components/NotificationPermissionModal';
+import { EventTemplate, TEMPLATE_CATEGORIES, TemplateCategory } from '../constants/eventTemplates';
 import { useTheme } from '../contexts/ThemeContext';
 import { useScreenTracking } from '../hooks/useScreenTracking';
 import AdsManager from '../services/adsManager';
 import NotificationService from '../services/NotificationService';
+import PurchaseManager from '../services/purchaseManager';
 import { loadData, saveData } from '../utils/storage';
+import { isStreakRewardActive, updateStreakOnEventSave } from '../utils/streakManager';
 
 export default function AddEventScreen() {
     const router = useRouter();
     const { selectedDate } = useLocalSearchParams();
-    const { colors, theme } = useTheme();
+    const { colors, theme, resolvedTheme } = useTheme();
     const { t } = useTranslation();
     const params = useLocalSearchParams();
     const [toastVisible, setToastVisible] = useState(false);
     const [toastMessage, setToastMessage] = useState('');
     const [is24Hour, setIs24Hour] = useState(false);
     const [userLocale, setUserLocale] = useState('en-US');
+    const [showTemplateModal, setShowTemplateModal] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState<TemplateCategory | null>(null);
 
     const [showRepeatModal, setShowRepeatModal] = useState(false);
     const [tempRepeatValue, setTempRepeatValue] = useState('does_not');
@@ -54,8 +58,44 @@ export default function AddEventScreen() {
     const titleInputRef = useRef<TextInput>(null);
     const [isNoteFocused, setIsNoteFocused] = useState(false);
     const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
     useScreenTracking('add_event_screen');
-    
+
+    // ✅ SIRF YE RAKHO
+    const [isPremiumUser, setIsPremiumUser] = useState(false);
+    const [rewardDaysLeft, setRewardDaysLeft] = useState(0);
+
+    useEffect(() => {
+        const checkAccess = async () => {
+            const premium = await PurchaseManager.isPremium();
+            setIsPremiumUser(premium);
+            const reward = await isStreakRewardActive();
+            setRewardDaysLeft(reward.daysLeft);
+        };
+        checkAccess();
+    }, []);
+
+    const hasBgImageAccess = isPremiumUser || rewardDaysLeft > 0;
+
+    useEffect(() => {
+        PurchaseManager.isPremium().then(setIsPremiumUser);
+    }, []);
+
+    {
+        !isPremiumUser && (
+            <View style={{
+                position: 'absolute',
+                top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: 'rgba(0,0,0,0.45)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 8,
+            }}>
+                <Ionicons name="lock-closed" size={20} color="#FFD700" />
+            </View>
+        )
+    }
+
     useFocusEffect(
         useCallback(() => {
             Keyboard.dismiss();
@@ -70,7 +110,20 @@ export default function AddEventScreen() {
             return () => clearTimeout(focusTimeout);
         }, [])
     );
-
+    const applyTemplate = (template: EventTemplate) => {
+        const isAllDay = template.reminder.includes('day') || template.reminder.includes('week');
+        setFormData(prev => ({
+            ...prev,
+            title: template.title,
+            color: template.color,
+            allDay: isAllDay,
+            reminders: [template.reminder],
+            description: '',
+        }));
+        setShowTemplateModal(false);
+        setSelectedCategory(null);
+        setTimeout(() => titleInputRef.current?.focus(), 300);
+    };
     const getMinStartTime = () => {
         const now = new Date();
         now.setMinutes(now.getMinutes() + 10);
@@ -78,7 +131,6 @@ export default function AddEventScreen() {
         now.setMilliseconds(0);
         return now;
     };
-
     const showToast = (message: string) => {
         if (Platform.OS === 'android') {
             ToastAndroid.show(message, ToastAndroid.LONG);
@@ -87,7 +139,6 @@ export default function AddEventScreen() {
             setToastVisible(true);
         }
     };
-
     const getInitialDate = () => {
         if (selectedDate && typeof selectedDate === 'string') {
             const parsedDate = new Date(selectedDate);
@@ -148,6 +199,7 @@ export default function AddEventScreen() {
         repeat: 'does_not',
         reminders: ['at_time'],
         color: '#0267FF',
+        bgImage: null as string | null,
     });
 
     useEffect(() => {
@@ -311,7 +363,7 @@ export default function AddEventScreen() {
         const checkFormat = async () => {
             const manual = await AsyncStorage.getItem('user_manual_24hour_override');
             setIs24Hour(manual === 'true');
-            setIs24HourFormat(manual === 'true');  // ← Set both states
+            setIs24HourFormat(manual === 'true');
         };
         checkFormat();
     }, []);
@@ -411,6 +463,7 @@ export default function AddEventScreen() {
         setShowColorPicker(false);
     };
 
+
     const validateMonthlyRepeat = () => {
         if (formData.repeat.toLowerCase().includes('month') || formData.repeat === 'every_month') {
             const start = new Date(formData.startDate);
@@ -467,7 +520,7 @@ export default function AddEventScreen() {
         const hasPermission = await NotificationService.checkPermissions();
 
         if (!hasPermission) {
-            console.log('❌ Notification permission not granted - showing custom modal');
+            console.log('Notification permission not granted - showing custom modal');
             setShowPermissionModal(true);
             return;
         }
@@ -520,6 +573,7 @@ export default function AddEventScreen() {
                 repeat: formData.repeat,
                 reminders: formData.reminders,
                 color: formData.color,
+                bgImage: formData.bgImage ?? null,
             };
 
             console.log('=== Scheduling Event Notifications ===');
@@ -559,6 +613,7 @@ export default function AddEventScreen() {
             const events = await loadData('events') || [];
             await saveData('events', [...events, newEvent]);
             console.log('Event saved successfully');
+            await updateStreakOnEventSave();
 
             const currentDate = selectedDate ? new Date(String(selectedDate)) : new Date();
 
@@ -573,10 +628,11 @@ export default function AddEventScreen() {
                 repeat: 'does_not',
                 reminders: ['at_time'],
                 color: '#0267FF',
+                bgImage: null,
             });
 
-            // ✅ Premium check — premium user ko ad mat dikhao
             const isPremium = await PurchaseManager.isPremium();
+
 
             const repeatMessage =
                 formData.repeat === 'Everyday' || formData.repeat === 'everyday' ? 'Daily reminders set!' :
@@ -588,11 +644,9 @@ export default function AddEventScreen() {
             showToast(`${t("event_created") || "Event created!"}${repeatMessage ? ' ' + repeatMessage : ''}`);
 
             if (isPremium) {
-                // Premium user — seedha navigate karo, no ads
                 console.log('👑 Premium user — skipping ad');
                 setTimeout(() => router.back(), 300);
             } else {
-                // Free user — ad dikhao
                 console.log('🎬 Attempting to show event save ad...');
                 const adShown = await AdsManager.showEventScreenInterstitialAd('CreateEvent', 'save');
 
@@ -629,16 +683,15 @@ export default function AddEventScreen() {
             repeat: 'does_not',
             reminders: ['at_time'],
             color: '#0267FF',
+            bgImage: null,
         });
     }, [selectedDate]);
 
     const currentDate = selectedDate ? new Date(String(selectedDate)) : new Date();
 
     const resetForm = () => {
-
         const freshDate = getInitialDate();
         const freshMinStartTime = getMinStartTime();
-
         setFormData({
             title: '',
             description: '',
@@ -650,19 +703,13 @@ export default function AddEventScreen() {
             endTime: new Date(minStartTime.getTime() + 3600000),
             repeat: 'does_not',
             reminders: ['at_time'],
+            bgImage: null,
         });
         setStartDate(freshDate);
         setEndDate(freshDate);
     };
-
-    // const handleCancel = () => {
-    //     resetForm();
-    //     router.back();
-    // };
     const handleCancel = async () => {
-
         const isPremium = await PurchaseManager.isPremium();
-
         if (isPremium) {
             console.log('👑 Premium user — skipping cancel ad');
             resetForm();
@@ -670,8 +717,6 @@ export default function AddEventScreen() {
             router.back();
             return;
         }
-
-        // Free user — ad dikhao
         console.log('🎬 Event cancelled, attempting to show ad...');
         const adShown = await AdsManager.showEventScreenInterstitialAd('CreateEvent', 'back');
 
@@ -704,31 +749,39 @@ export default function AddEventScreen() {
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
             <View style={[styles.header, { backgroundColor: colors.background }]}>
-                {/* <View style={styles.leftContainer}> */}
+                <TouchableOpacity
+                    onPress={handleCancel}
+                    style={styles.backButton}
+                >
+                    <View style={[styles.closeBtnCircle, { backgroundColor: colors.cardBackground }]}>
+                        <Ionicons name="chevron-back" size={28} color={colors.textSecondary} />
+                    </View>
+                </TouchableOpacity>
+
+                <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+                    {t("add_event")}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <TouchableOpacity
-                        onPress={handleCancel}
-                        style={styles.backButton}
+                        onPress={() => {
+                            setSelectedCategory(null);
+                            setShowTemplateModal(true);
+                        }}
+                        style={[styles.templateBtn, { backgroundColor: colors.cardBackground }]}
                     >
-                        <View style={[styles.closeBtnCircle, { backgroundColor: colors.cardBackground }]}>
-                            {/* <Text style={[styles.closeBtnX, { color: colors.textPrimary }]}>✕</Text> */}
-                            <Ionicons name="chevron-back" size={28} color={colors.textSecondary} />
-                        </View>
-                        {/* <Text style={[styles.headerButton, { color: colors.textPrimary }]}>✕</Text> */}
+                        <Ionicons name="grid-outline" size={18} color={colors.primary} />
                     </TouchableOpacity>
 
-                    <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-                        {t("add_event")}
-                    </Text>
-                {/* </View> */}
-                <TouchableOpacity onPress={saveEvent}>
-                    <Text style={[styles.saveText, styles.saveButton]}>{t("save")}</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity onPress={saveEvent}>
+                        <Text style={[styles.saveText, styles.saveButton]}>{t("save")}</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined} // ← Changed
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0} // ← Set to 0
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
                 <SafeAreaView style={{ flex: 1 }}>
                     <ScrollView
@@ -741,7 +794,7 @@ export default function AddEventScreen() {
                         <View style={[styles.titleContainer, { borderBottomColor: colors.border }]}>
                             <TextInput
                                 placeholder={t("add_title")}
-                                ref={titleInputRef}  // ← यह line add करें
+                                ref={titleInputRef}
                                 placeholderTextColor={colors.textSecondary}
                                 style={[styles.titleInput, { color: colors.textPrimary }]}
                                 value={formData.title}
@@ -754,7 +807,6 @@ export default function AddEventScreen() {
                             />
                         </View>
 
-                        {/* // REPLACE the entire All-Day section with: */}
                         <View style={[styles.row, { backgroundColor: colors.cardBackground, borderRadius: 10, paddingLeft: 10, paddingRight: 10 }]}>
                             <Text style={[styles.label, { color: colors.textPrimary }]}>{t("all_day")}</Text>
                             <Switch
@@ -851,7 +903,6 @@ export default function AddEventScreen() {
                             </View>
                         )}
 
-                        {/* Repeat - NOW AS MODAL POPUP */}
                         <View style={styles.dateColumn}>
                             <Text style={[styles.dateLabel, { color: colors.textPrimary }]}>{t("repeat")}</Text>
                             <TouchableOpacity
@@ -936,6 +987,131 @@ export default function AddEventScreen() {
                                 </View>
                             </TouchableOpacity>
                         </View>
+                        {/* Background Image Picker */}
+                        <View style={styles.dateColumn}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 20, marginBottom: 0 }}>
+                                <Text style={[styles.dateLabel, { color: colors.textPrimary, paddingTop: 0 }]}>
+                                    Background Image
+                                </Text>
+                                {/* Badge — reward active ho to green, warna gold PRO */}
+                                {rewardDaysLeft > 0 ? (
+                                    <View style={{
+                                        backgroundColor: '#22c55e',
+                                        paddingHorizontal: 7,
+                                        paddingVertical: 2,
+                                        borderRadius: 6,
+                                    }}>
+                                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
+                                            FREE {rewardDaysLeft}d
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <View style={{
+                                        backgroundColor: '#FFD700',
+                                        paddingHorizontal: 7,
+                                        paddingVertical: 2,
+                                        borderRadius: 6,
+                                    }}>
+                                        <Text style={{ color: '#000', fontSize: 10, fontWeight: '700' }}>PRO</Text>
+                                    </View>
+                                )}
+                            </View>
+
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={{ gap: 10, paddingVertical: 6 }}
+                            >
+                                {/* None option */}
+                                <TouchableOpacity
+                                    onPress={async () => {
+                                        if (!hasBgImageAccess) {
+                                            router.push('/PremiumScreen');
+                                            return;
+                                        }
+                                        setFormData({ ...formData, bgImage: null });
+                                    }}
+                                    style={{
+                                        width: 70,
+                                        height: 70,
+                                        borderRadius: 10,
+                                        backgroundColor: colors.cardBackground,
+                                        borderWidth: 2,
+                                        borderColor: formData.bgImage === null ? '#FF5252' : colors.border,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <Feather name="x" size={22} color={colors.textSecondary} />
+                                    <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 3 }}>None</Text>
+                                </TouchableOpacity>
+
+                                {/* Image options */}
+                                {(() => {
+                                    const prefix = resolvedTheme === 'dark' ? 'dark' : 'light';
+                                    const images: { [key: string]: any } = {
+                                        'light': require('../assets/temp/light.jpeg'),
+                                        'light1': require('../assets/temp/light1.jpeg'),
+                                        'light2': require('../assets/temp/light2.jpeg'),
+                                        'light3': require('../assets/temp/light3.jpeg'),
+                                        'light4': require('../assets/temp/light4.jpeg'),
+                                        'light5': require('../assets/temp/light5.jpeg'),
+                                        'light6': require('../assets/temp/light6.jpeg'),
+                                        'light7': require('../assets/temp/light7.jpeg'),
+                                        'light8': require('../assets/temp/light8.jpeg'),
+                                        'dark': require('../assets/temp/dark.jpeg'),
+                                        'dark1': require('../assets/temp/dark1.jpeg'),
+                                        'dark2': require('../assets/temp/dark2.jpeg'),
+                                        'dark3': require('../assets/temp/dark3.jpeg'),
+                                        'dark4': require('../assets/temp/dark4.jpeg'),
+                                        'dark5': require('../assets/temp/dark5.jpeg'),
+                                        'dark6': require('../assets/temp/dark6.jpeg'),
+                                        'dark7': require('../assets/temp/dark7.jpeg'),
+                                        'dark8': require('../assets/temp/dark8.jpeg'),
+                                    };
+                                    const keys = [`${prefix}`, `${prefix}1`, `${prefix}2`, `${prefix}3`,
+                                    `${prefix}4`, `${prefix}5`, `${prefix}6`, `${prefix}7`, `${prefix}8`];
+
+                                    return keys.map((key) => (
+                                        <TouchableOpacity
+                                            key={key}
+                                            onPress={async () => {
+                                                if (!hasBgImageAccess) {
+                                                    router.push('/PremiumScreen');
+                                                    return;
+                                                }
+                                                setFormData({ ...formData, bgImage: key });
+                                            }}
+                                            style={{
+                                                borderRadius: 10,
+                                                overflow: 'hidden',
+                                                borderWidth: 2.5,
+                                                borderColor: formData.bgImage === key ? '#FF5252' : 'transparent',
+                                            }}
+                                        >
+                                            <Image
+                                                source={images[key]}
+                                                style={{ width: 70, height: 70 }}
+                                                resizeMode="cover"
+                                            />
+                                            {/* Lock sirf tab dikhao jab access nahi */}
+                                            {!hasBgImageAccess && (
+                                                <View style={{
+                                                    position: 'absolute',
+                                                    top: 0, left: 0, right: 0, bottom: 0,
+                                                    backgroundColor: 'rgba(0,0,0,0.45)',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    borderRadius: 8,
+                                                }}>
+                                                    <Ionicons name="lock-closed" size={20} color="#FF5252" />
+                                                </View>
+                                            )}
+                                        </TouchableOpacity>
+                                    ));
+                                })()}
+                            </ScrollView>
+                        </View>
                         {/* Note */}
                         <TextInput
                             placeholder={t("note")}
@@ -979,8 +1155,6 @@ export default function AddEventScreen() {
                 onClose={handlePermissionModalClose}
                 colors={colors}
             />
-
-            {/* Color Picker Modal */}
             <Modal
                 visible={showColorPicker}
                 transparent={true}
@@ -1014,8 +1188,97 @@ export default function AddEventScreen() {
                     </View>
                 </TouchableOpacity>
             </Modal>
+            <Modal
+                visible={showTemplateModal}
+                transparent
+                animationType="slide"
+                onRequestClose={() => {
+                    setSelectedCategory(null);
+                    setShowTemplateModal(false);
+                }}
+            >
+                <View style={tmplStyles.overlay}>
+                    <View style={[tmplStyles.sheet, { backgroundColor: colors.background }]}>
 
-            {/* Start Date Picker Modal */}
+                        {/* Header */}
+                        <View style={tmplStyles.sheetHeader}>
+                            {selectedCategory ? (
+                                <TouchableOpacity onPress={() => setSelectedCategory(null)}>
+                                    <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+                                </TouchableOpacity>
+                            ) : (
+                                <View style={{ width: 24 }} />
+                            )}
+                            <Text style={[tmplStyles.sheetTitle, { color: colors.textPrimary }]}>
+                                {selectedCategory ? selectedCategory.name : 'Templates'}
+                            </Text>
+                            <TouchableOpacity onPress={() => {
+                                setSelectedCategory(null);
+                                setShowTemplateModal(false);
+                            }}>
+                                <Ionicons name="close" size={24} color={colors.textSecondary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Categories */}
+                        {!selectedCategory ? (
+                            <ScrollView showsVerticalScrollIndicator={false}>
+                                <View style={tmplStyles.categoryGrid}>
+                                    {TEMPLATE_CATEGORIES.map(cat => (
+                                        <TouchableOpacity
+                                            key={cat.id}
+                                            style={[tmplStyles.categoryCard, {
+                                                backgroundColor: colors.cardBackground,
+                                                borderColor: cat.color + '40',
+                                                borderWidth: 1.5,
+                                            }]}
+                                            onPress={() => setSelectedCategory(cat)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={[tmplStyles.categoryIcon, { backgroundColor: cat.color + '20' }]}>
+                                                <Text style={{ fontSize: 28 }}>{cat.emoji}</Text>
+                                            </View>
+                                            <Text style={[tmplStyles.categoryName, { color: colors.textPrimary }]}>
+                                                {cat.name}
+                                            </Text>
+                                            <Text style={[tmplStyles.categoryCount, { color: colors.textTertiary }]}>
+                                                {cat.templates.length} templates
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </ScrollView>
+                        ) : (
+                            // Templates list
+                            <ScrollView showsVerticalScrollIndicator={false}>
+                                {selectedCategory.templates.map(template => (
+                                    <TouchableOpacity
+                                        key={template.id}
+                                        style={[tmplStyles.templateRow, {
+                                            backgroundColor: colors.cardBackground,
+                                            borderLeftColor: template.color,
+                                        }]}
+                                        onPress={() => applyTemplate(template)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={[tmplStyles.templateEmoji, { backgroundColor: template.color + '20' }]}>
+                                            <Text style={{ fontSize: 22 }}>{template.emoji}</Text>
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={[tmplStyles.templateTitle, { color: colors.textPrimary }]}>
+                                                {template.title}
+                                            </Text>
+                                            {/* <Text style={[tmplStyles.templateReminder, { color: colors.textTertiary }]}>
+                                                🔔 Reminder: {template.reminder.replace(/_/g, ' ')}
+                                            </Text> */}
+                                        </View>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        )}
+                    </View>
+                </View>
+            </Modal>
             <Modal
                 visible={showStartDatePicker}
                 transparent={true}
@@ -1105,7 +1368,6 @@ export default function AddEventScreen() {
                 </TouchableOpacity>
             </Modal>
 
-            {/* REPEAT MODAL - NEW POPUP INSTEAD OF NAVIGATION */}
             <Modal visible={showRepeatModal} transparent animationType="fade">
                 <View style={styles.centeredModalContainer}>
                     <TouchableOpacity
@@ -1149,7 +1411,6 @@ export default function AddEventScreen() {
                 </View>
             </Modal>
 
-            {/* REMINDER MODAL */}
             <Modal visible={showReminderModal} transparent animationType="fade">
                 <View style={styles.centeredModalContainer}>
                     <TouchableOpacity
@@ -1193,7 +1454,6 @@ export default function AddEventScreen() {
                 </View>
             </Modal>
 
-            {/* TIME PICKER MODAL */}
             <Modal
                 visible={showTimePicker}
                 transparent={true}
@@ -1287,6 +1547,87 @@ export default function AddEventScreen() {
         </View>
     );
 }
+const tmplStyles = StyleSheet.create({
+    overlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    sheet: {
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 20,
+        maxHeight: '80%',
+        minHeight: '50%',
+    },
+    sheetHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 20,
+    },
+    sheetTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    categoryGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+        paddingBottom: 30,
+    },
+    categoryCard: {
+        width: '47%',
+        borderRadius: 16,
+        padding: 16,
+        alignItems: 'center',
+        gap: 8,
+    },
+    categoryIcon: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    categoryName: {
+        fontSize: 13,
+        fontWeight: '600',
+        textAlign: 'center',
+    },
+    categoryCount: {
+        fontSize: 11,
+    },
+    templateRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 10,
+        borderLeftWidth: 4,
+        gap: 12,
+    },
+    templateEmoji: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    templateTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        marginBottom: 3,
+    },
+    templateReminder: {
+        fontSize: 12,
+    },
+    colorDot: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+    },
+});
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -1297,6 +1638,18 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         marginTop: 50,
+    },
+    templateBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 8,
+    },
+    templateBtnText: {
+        fontSize: 13,
+        fontWeight: '600',
     },
     datePickerModal: {
         borderRadius: 16,

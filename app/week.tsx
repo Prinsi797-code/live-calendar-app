@@ -15,9 +15,15 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import {
+    BannerAdSize,
+    GAMBannerAd
+} from 'react-native-google-mobile-ads';
 import { COUNTRY_CALENDAR_IDS } from '../constants/countryCalendars';
 import { useTheme } from '../contexts/ThemeContext';
 import { useScreenTracking } from '../hooks/useScreenTracking';
+import AdsManager from '../services/adsManager';
+import PurchaseManager from '../services/purchaseManager';
 import { loadData } from '../utils/storage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -61,7 +67,6 @@ export default function WeekScreen() {
 
     useScreenTracking('Week_screen');
 
-    // ── Init ──────────────────────────────────────────────────────────────────
     useEffect(() => {
         const today = new Date();
         const diff = ((today.getDay() - firstDayOfWeek) + 7) % 7;
@@ -123,7 +128,6 @@ export default function WeekScreen() {
             setFirstDayOfWeek(day);
             setRefreshKey(prev => prev + 1);
 
-            // CalendarScreen ka callback bhi call karo agar exist kare
             if (prevCallback) prevCallback(day);
         };
 
@@ -178,7 +182,6 @@ export default function WeekScreen() {
     };
     navRef.current = { goToNextWeek, goToPrevWeek };
 
-    // ── PanResponder — only moves the week strip ──────────────────────────────
     const panResponder = useRef(
         PanResponder.create({
             onMoveShouldSetPanResponder: (_, g) =>
@@ -215,7 +218,6 @@ export default function WeekScreen() {
         })
     ).current;
 
-    // ── Event helpers (unchanged) ─────────────────────────────────────────────
     const shouldShowEventOnDate = (event: any, targetDateStr: string): boolean => {
         const eventStart = new Date(event.startDate.split('T')[0] + 'T00:00:00');
         const targetDate = new Date(targetDateStr + 'T00:00:00');
@@ -254,7 +256,7 @@ export default function WeekScreen() {
         pulse.start();
         return () => pulse.stop();
     }, []);
-    
+
     const pulseStyle = {
         transform: [
             {
@@ -288,7 +290,6 @@ export default function WeekScreen() {
 
     const dayHasEvents = (date: Date) => getEventsForDate(getLocalDateString(date)).length > 0;
 
-    // ── Format helpers (unchanged) ────────────────────────────────────────────
     const formatMonthYear = (date: Date) => {
         const monthKeys = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
         const monthName = t(monthKeys[date.getMonth()]);
@@ -372,20 +373,41 @@ export default function WeekScreen() {
                 color: event.color || '#0267FF',
                 isHoliday: String(event.isHoliday || false),
                 country: event.country || '',
+                bgImage: event.bgImage || '',
             }
         });
     };
 
-    // ── Render data ───────────────────────────────────────────────────────────
+    const [isPremium, setIsPremium] = useState(false);
+    const [bannerConfig, setBannerConfig] = useState<{ show: boolean; id: string } | null>(null);
+    const [isAdsReady, setIsAdsReady] = useState(false);
+    const checkPremiumStatus = async () => {
+        const premiumStatus = await PurchaseManager.isPremium();
+
+        setIsPremium(premiumStatus);
+        if (premiumStatus) setBannerConfig(null);
+    };
+
+    useEffect(() => {
+        const initAds = async () => {
+            await checkPremiumStatus();
+            const premiumStatus = await PurchaseManager.isPremium();
+
+            if (premiumStatus) { setIsAdsReady(true); return; }
+            if (!AdsManager.isConfigReady()) await AdsManager.initializeAds();
+            setBannerConfig(AdsManager.getBannerConfig("main"));
+            setIsAdsReady(true);
+        };
+        initAds();
+    }, []);
     const weekDays = getWeekDays();
     const todayStr = getLocalDateString();
     const selectedEvents = getEventsForDate(selectedDate);
-    // Compute prev/next week start dates for the 3-slot strip
     const prevWeekStart = new Date(currentWeekStart);
     prevWeekStart.setDate(currentWeekStart.getDate() - 7);
     const nextWeekStart = new Date(currentWeekStart);
     nextWeekStart.setDate(currentWeekStart.getDate() + 7);
-
+    const showBanner = !isPremium && bannerConfig?.show;
     const threeWeeks = [
         getWeekDaysFrom(prevWeekStart),
         getWeekDaysFrom(currentWeekStart),
@@ -394,7 +416,7 @@ export default function WeekScreen() {
 
     const EventCard = ({ event }: { event: any }) => (
         <TouchableOpacity
-            style={[styles.eventCard, { backgroundColor: isDark ? '#1C1C2E' : '#F5F5F8' }]}
+            style={[styles.eventCard, { backgroundColor: colors.cardBackground }]}
             onPress={() => handleEventPress(event)}
             activeOpacity={0.75}
         >
@@ -549,8 +571,7 @@ export default function WeekScreen() {
                 {selectedEvents.length === 0 ? (
                     <View style={{ alignItems: "center", paddingVertical: 40 }}>
                         <Image
-                            // source={theme === "dark" ? darkNoEventImg : lightNoEventImg}
-                            source={resolvedTheme === "dark" ? darkNoEventImg : lightNoEventImg} // 👈
+                            source={resolvedTheme === "dark" ? darkNoEventImg : lightNoEventImg} 
                             style={{ width: 200, height: 200, marginBottom: 0 }}
                             resizeMode="contain"
                         />
@@ -568,8 +589,7 @@ export default function WeekScreen() {
                 )}
             </ScrollView>
 
-            {/* ── FAB ── */}
-            <View style={{ position: "absolute", right: 30, bottom: 170 }}>
+            <View style={{ position: "absolute", right: 30, bottom: 100 }}>
                 <Animated.View
                     style={[
                         styles.pulseRing,
@@ -596,7 +616,15 @@ export default function WeekScreen() {
                     />
                 </TouchableOpacity>
             </View>
-
+            {showBanner && (
+                <View style={styles.stickyAdContainer}>
+                    <GAMBannerAd
+                        unitId={bannerConfig!.id}
+                        sizes={[BannerAdSize.ANCHORED_ADAPTIVE_BANNER]}
+                        requestOptions={{ requestNonPersonalizedAdsOnly: true }}
+                    />
+                </View>
+            )}
         </View>
     );
 }
@@ -638,6 +666,12 @@ const styles = StyleSheet.create({
         shadowRadius: 6,
         elevation: 4,
     },
+    stickyAdContainer: {
+        position: 'absolute',
+        bottom: 0,
+        width: '100%',
+        alignItems: 'center',
+    },
     design: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -661,7 +695,7 @@ const styles = StyleSheet.create({
     dateCellNumber: { fontSize: 15 },
     eventDot: { width: 5, height: 5, borderRadius: 2.5 },
     divider: { height: 1 },
-    eventsList: { flex: 1, paddingHorizontal: 16 },
+    eventsList: { flex: 1, paddingHorizontal: 16},
     selectedDayLabel: { fontSize: 13, fontWeight: '700', marginTop: 16, marginBottom: 10, letterSpacing: 0.3 },
     otherDayLabel: { fontSize: 13, fontWeight: '600', marginTop: 22, marginBottom: 10, letterSpacing: 0.3 },
     eventCard: {

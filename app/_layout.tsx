@@ -20,6 +20,12 @@ import OnboardingService from '../services/OnboardingService';
 import PurchaseManager from '../services/purchaseManager';
 import { initAnalytics, trackAppOpen, trackEvent, trackScreen } from '../utils/analytics';
 import { initializeI18n } from '../utils/i18n';
+import {
+  getStreak, scheduleOnboardingNotificationIfNeeded,
+  scheduleStreakWarningIfNeeded
+} from '../utils/streakManager';
+
+
 
 // Initialize Sentry - Only in Production
 Sentry.init({
@@ -379,6 +385,7 @@ function DrawerNavigator() {
                   color: event.color || '#0267FF',
                   isHoliday: String(event.isHoliday || false),
                   country: event.country || '',
+                  bgImage: event.bgImage || '',
                 }
               };
             }
@@ -483,7 +490,6 @@ function DrawerNavigator() {
     initializeApp();
   }, []);
 
-  // App background → foreground detect karo
   useEffect(() => {
     const subscription = AppState.addEventListener('change', async (nextState: AppStateStatus) => {
       if (nextState === 'active') {
@@ -571,7 +577,7 @@ function DrawerNavigator() {
     const subscription = NotificationService.setupNotificationListeners(
       async (response) => {
         const data = response.notification.request.content.data;
-        console.log('app store',data);
+        console.log('app store', data);
 
         if (data?.type === 'app_store_update') {
           const appStoreId = data.appStoreId;
@@ -585,7 +591,6 @@ function DrawerNavigator() {
     return () => subscription.remove();
   }, []);
 
-  // Navigate to language screen for first-time users
   useEffect(() => {
     if (isReady && !showSplashAd && shouldShowLanguage && !openedFromNotification) {
       console.log('🌐 Navigating to language screen (first time user)');
@@ -595,7 +600,6 @@ function DrawerNavigator() {
     }
   }, [isReady, showSplashAd, shouldShowLanguage, router, openedFromNotification]);
 
-  // CRITICAL: Don't render drawer until splash is COMPLETELY done
   if (!isReady || showSplashAd) {
     console.log('⏳ Showing splash...', { isReady, showSplashAd, openedFromNotification });
 
@@ -689,6 +693,7 @@ function DrawerNavigator() {
 function CustomHeader() {
   const navigation = useNavigation();
   const { colors, theme } = useTheme();
+  const [streakCount, setStreakCount] = useState(0);
   const router = useRouter();
   const formatDate = (d: number) => (d < 10 ? `0${d}` : d);
   const { currentYear: themeYear } = useTheme();
@@ -700,6 +705,28 @@ function CustomHeader() {
     setDisplayYear(themeYear);
     console.log('📍 Header display year updated to:', themeYear);
   }, [themeYear]);
+
+  
+  useEffect(() => {
+    const loadStreak = async () => {
+      const streak = await getStreak();
+      setStreakCount(streak.count);
+    };
+
+    const initStreak = async () => {
+      await loadStreak();
+      await scheduleOnboardingNotificationIfNeeded();
+      await scheduleStreakWarningIfNeeded();
+    };
+
+    initStreak();
+
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') loadStreak();
+    });
+
+    return () => sub.remove();
+  }, []);
 
   const handleDateBoxPress = () => {
     try {
@@ -755,6 +782,13 @@ function CustomHeader() {
         </Text>
       </View>
       <View style={styles.rightIcons}>
+        <TouchableOpacity
+          onPress={() => router.push('/streak')}
+          style={[styles.streakBadge, { backgroundColor: colors.cardBackground }]}
+        >
+          <Text style={styles.streakEmoji}>🔥</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           onPress={() => router.push('/PremiumScreen')}
           style={[styles.premiumButton, { backgroundColor: colors.cardBackground }]}
@@ -1161,6 +1195,21 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
     marginRight: 170,
+  },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 50,
+    gap: 4,
+  },
+  streakEmoji: {
+    fontSize: 16,
+  },
+  streakText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   rightIcons: {
     flexDirection: 'row',

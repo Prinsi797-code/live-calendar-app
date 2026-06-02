@@ -2,7 +2,7 @@
   "expo": {
     "name": "Smart Calendar 2026",
     "slug": "calendarapp",
-    "version": "1.0.22",
+    "version": "1.0.23",
     "orientation": "portrait",
     "icon": "./assets/icons/logo.png",
     "owner": "docflow789",

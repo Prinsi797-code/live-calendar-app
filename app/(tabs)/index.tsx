@@ -7,11 +7,13 @@ import * as Notifications from 'expo-notifications';
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from "react-i18next";
-import { Alert, Animated, Image, PanResponder, ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { Alert, Animated, Image, ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { COUNTRY_CALENDAR_IDS } from '../../constants/countryCalendars';
+
 import { useTheme } from '../../contexts/ThemeContext';
 import { loadData, saveData } from '../../utils/storage';
+
 
 declare global {
   var firstDayChanged: ((day: number) => void) | undefined;
@@ -25,23 +27,14 @@ interface Holiday {
 }
 
 export default function CalendarScreen({ navigation }: any) {
+
   const { trialActive, remainingDays } = useTrial();
   const systemColorScheme = useColorScheme();
-  const { colors, theme, setCurrentYear, resolvedTheme } = useTheme();
-  const isDarkMode = resolvedTheme === 'dark';
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const isCollapsedRef = useRef(false);
-  const currentHeightRef = useRef(400);
-  const [fullCalendarHeight, setFullCalendarHeight] = useState(350);
-  const [dynamicCollapsedHeight, setDynamicCollapsedHeight] = useState(190);
-  const collapsedHeightRef = useRef(190);
-  const rowHeightRef = useRef(0);
-  const visibleRowsRef = useRef(6);
 
-  const dividerImg = require("../../assets/images/divider.png");
-  const upImg = require("../../assets/images/up.png");
-  const downImg = require("../../assets/images/down.png");
-  const [dividerState, setDividerState] = useState<'line' | 'up' | 'down'>('line');
+  // const { colors, theme, setCurrentYear, resolvedTheme, colorVersion } = useTheme();
+  const { colors, theme, setCurrentYear, resolvedTheme } = useTheme();
+
+  const isDarkMode = resolvedTheme === 'dark';
 
   const getLocalDateString = (date: Date = new Date()): string => {
     const year = date.getFullYear();
@@ -56,9 +49,12 @@ export default function CalendarScreen({ navigation }: any) {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [firstDayOfWeek, setFirstDayOfWeek] = useState(0);
   const pathname = usePathname();
+  // const { colors, theme } = useTheme();
   const isFocused = useIsFocused();
   const router = useRouter();
+  // const { setCurrentYear } = useTheme();
   const [showMonthEvents, setShowMonthEvents] = useState(true);
+  // const [colorVersion, setColorVersion] = useState(0);
   const [menuVisible, setMenuVisible] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedCountries, setSelectedCountries] = useState<string[]>(['United States']);
@@ -69,79 +65,9 @@ export default function CalendarScreen({ navigation }: any) {
 
   const lightNoEventImg = require("../../assets/images/no-events.png");
   const darkNoEventImg = require("../../assets/images/dark-no-event.png");
-  const calendarHeight = useRef(new Animated.Value(330)).current;
 
   const params = useLocalSearchParams();
   const [calendarKey, setCalendarKey] = useState(0);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 5,
-
-      onPanResponderGrant: () => {
-        currentHeightRef.current = isCollapsedRef.current
-          ? collapsedHeightRef.current
-          : fullCalendarHeight;
-      },
-
-      onPanResponderMove: (_, g) => {
-        const newHeight = Math.max(
-          collapsedHeightRef.current,
-          Math.min(fullCalendarHeight, currentHeightRef.current + g.dy)
-        );
-        calendarHeight.setValue(newHeight);
-
-        if (g.dy < -8) {
-          setDividerState('up');
-        } else if (g.dy > 8) {
-          setDividerState('down');
-        } else {
-          setDividerState('line');
-        }
-      },
-
-      onPanResponderRelease: (_, g) => {
-        const headerHeight = 78;
-        const oneRow = rowHeightRef.current;
-
-        if (oneRow <= 0) {
-          Animated.spring(calendarHeight, {
-            toValue: isCollapsedRef.current ? collapsedHeightRef.current : fullCalendarHeight,
-            useNativeDriver: false,
-            tension: 60, friction: 10,
-          }).start();
-          setDividerState('line');
-          return;
-        }
-        const currentH = Math.max(
-          collapsedHeightRef.current,
-          Math.min(fullCalendarHeight, currentHeightRef.current + g.dy)
-        );
-        const visibleRows = (currentH - headerHeight) / oneRow;
-
-        let targetRows = Math.round(visibleRows);
-        targetRows = Math.max(1, Math.min(6, targetRows));
-        const targetHeight = headerHeight + targetRows * oneRow;
-
-        Animated.spring(calendarHeight, {
-          toValue: targetHeight,
-          useNativeDriver: false,
-          tension: 80,
-          friction: 12,
-        }).start();
-
-        const collapsed = targetRows <= 1;
-        isCollapsedRef.current = collapsed;
-        setIsCollapsed(collapsed);
-        visibleRowsRef.current = targetRows;
-
-        currentHeightRef.current = targetHeight;
-
-        setDividerState('line');
-      },
-    })
-  ).current;
 
   useEffect(() => {
     const requestNotificationPermission = async () => {
@@ -153,12 +79,12 @@ export default function CalendarScreen({ navigation }: any) {
           const { status } = await Notifications.requestPermissionsAsync();
 
           if (status === 'granted') {
-            console.log('Notification permission granted');
+            console.log('✅ Notification permission granted');
           } else {
-            console.log('Notification permission denied');
+            console.log('❌ Notification permission denied');
           }
         } else {
-          console.log('Notification permission already granted');
+          console.log('✅ Notification permission already granted');
         }
       } catch (error) {
         console.error('Error requesting notification permission:', error);
@@ -270,12 +196,10 @@ export default function CalendarScreen({ navigation }: any) {
 
     if (params.refresh) {
       console.log('Calendar refresh triggered');
-
       if (params.scrollToCurrentMonth === 'true') {
         console.log('Scrolling to current month');
         const today = new Date();
         const todayString = getLocalDateString(today);
-
         setCurrentCalendarDate(todayString);
         setCurrentMonth({
           month: today.getMonth() + 1,
@@ -415,6 +339,13 @@ export default function CalendarScreen({ navigation }: any) {
     setRefreshKey(prev => prev + 1);
   }, [i18n.language, t]);
 
+  // useEffect(() => {
+  //   const today = new Date().toISOString().split('T')[0];
+  //   setSelectedDate(today);
+  //   setShowMonthEvents(true);
+  //   loadSelectedCountries();
+  // }, []);
+
   useEffect(() => {
     global.firstDayChanged = (day: number) => {
       setFirstDayOfWeek(day);
@@ -498,44 +429,7 @@ export default function CalendarScreen({ navigation }: any) {
       setLoadingHolidays(false);
     }
   };
-  const AnimatedDashedRing = ({ color }: { color: string }) => {
-    const rotateAnim = useRef(new Animated.Value(0)).current;
 
-    useEffect(() => {
-      Animated.loop(
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 4000,
-          useNativeDriver: true,
-        })
-      ).start();
-    }, []);
-
-    const spin = rotateAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['0deg', '360deg'],
-    });
-
-    return (
-      <Animated.View
-        style={[
-          StyleSheet.absoluteFillObject,
-          {
-            borderRadius: 22,
-            borderWidth: 1.5,
-            borderColor: color,
-            borderStyle: 'dashed',
-            transform: [{ rotate: spin }],
-            position: 'absolute',
-            top: -3,
-            left: -3,
-            right: -3,
-            bottom: -3,
-          },
-        ]}
-      />
-    );
-  };
   const getRepeatDisplayText = (repeat: string) => {
     if (!repeat) return t('never');
     switch (repeat.toLowerCase()) {
@@ -790,6 +684,7 @@ export default function CalendarScreen({ navigation }: any) {
       }
     });
 
+    // Add holiday dots (red dots for holidays)
     holidays.forEach((h) => {
       if (!marked[h.date]) {
         marked[h.date] = { marked: true, dots: [{ color: "#FF5252" }] };
@@ -829,6 +724,7 @@ export default function CalendarScreen({ navigation }: any) {
         selectedColor: colors.primary,
       };
     }
+
     return marked;
   };
 
@@ -837,6 +733,12 @@ export default function CalendarScreen({ navigation }: any) {
     const selectedDateOnly = dateToUse.split('T')[0];
     const selectedD = new Date(selectedDateOnly + 'T00:00:00');
     const allEvents: any[] = [];
+
+
+    // const selected = selectedDate;
+    // const selectedDateOnly = selected.split('T')[0];
+    // const selectedD = new Date(selectedDateOnly + 'T00:00:00');
+    // const allEvents: any[] = [];
 
     events.forEach((event) => {
       const repeatType = event.repeat;
@@ -940,34 +842,19 @@ export default function CalendarScreen({ navigation }: any) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Animated.View
-        style={{
-          height: calendarHeight,
-          overflow: 'hidden',
-          margin: 2,
-          borderRadius: 10,
-          elevation: 4,
-        }}
-        onLayout={(e) => {
-          const h = e.nativeEvent.layout.height;
-          if (!isCollapsedRef.current && h > 200) {
-            setFullCalendarHeight(h);
-            currentHeightRef.current = h;
-
-            const headerAndDayNames = 78;
-            const totalRowsHeight = h - headerAndDayNames;
-            const oneRowHeight = totalRowsHeight / 6;
-
-            rowHeightRef.current = oneRowHeight;
-
-            const collapsed = Math.ceil(headerAndDayNames + oneRowHeight + 4);
-            setDynamicCollapsedHeight(collapsed);
-            collapsedHeightRef.current = collapsed;
-          }
-        }}
-      >
+      {/* <TrialBanner visible={trialActive} remainingDays={remainingDays} /> */}
+      <View style={[styles.calendarContainer, {
+        margin: 10,
+        borderRadius: 10,
+        backgroundColor: colors.background,
+        shadowColor: '#535353',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 4,
+      }]}>
         <Calendar
-          key={`${resolvedTheme}-${theme}-${firstDayOfWeek}-${refreshKey}-${i18n.language}-${calendarKey}`}
+          key={`${resolvedTheme}-${theme}-${firstDayOfWeek}-${refreshKey}-${i18n.language}-${calendarKey}-${systemColorScheme}`}
           firstDay={firstDayOfWeek}
           current={currentCalendarDate}
           onDayPress={(day) => {
@@ -988,11 +875,12 @@ export default function CalendarScreen({ navigation }: any) {
             setShowMonthEvents(true);
           }}
           enableSwipeMonths={true}
-          style={{ backgroundColor: colors.background, }}
+          style={{ backgroundColor: colors.background, borderRadius: 10 }}
           theme={{
             backgroundColor: colors.background,
             calendarBackground: colors.background,
             textSectionTitleColor: colors.textPrimary,
+            // textSectionTitleColor: colors.textSecondary,
             textSectionTitleDisabledColor: colors.textTertiary,
             selectedDayBackgroundColor: colors.primary,
             selectedDayTextColor: '#ffffff',
@@ -1007,6 +895,7 @@ export default function CalendarScreen({ navigation }: any) {
             indicatorColor: colors.primary,
           }}
           dayComponent={({ date, state, marking }: any) => {
+            // const isSunday = new Date(date.dateString).getDay() === 0;
             const isSunday = new Date(date.dateString + 'T00:00:00').getDay() === 0;
             const currentDateString = getLocalDateString();
             const isSelected = date.dateString === selectedDate;
@@ -1050,6 +939,7 @@ export default function CalendarScreen({ navigation }: any) {
                 />
               );
             };
+
             const getBackgroundColor = () => {
               if (isSelected) {
                 return colors.primary;
@@ -1078,6 +968,14 @@ export default function CalendarScreen({ navigation }: any) {
                   setSelectedDate(date.dateString);
                   setShowMonthEvents(false);
                 }}
+                // onLongPress={() => {
+                //   setSelectedDate(date.dateString);
+                //   router.push({
+                //     pathname: '/templateSelection',
+                //     params: { selectedDate: date.dateString }
+                //   });
+                // }}
+                // delayLongPress={400}
                 style={{
                   width: 32,
                   height: 32,
@@ -1097,9 +995,7 @@ export default function CalendarScreen({ navigation }: any) {
                 >
                   {date.day}
                 </Text>
-
                 {isToday && <RunningDotRing />}
-
                 {marking?.dots && marking.dots.length > 0 && (
                   <View style={{ flexDirection: "row", position: "absolute", bottom: 3 }}>
                     {marking.dots.map((dot: any, index: number) => (
@@ -1119,24 +1015,6 @@ export default function CalendarScreen({ navigation }: any) {
               </TouchableOpacity>
             );
           }}
-        />
-      </Animated.View>
-      <View
-        {...panResponder.panHandlers}
-        style={{
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingVertical: 5,
-        }}
-      >
-        <Image
-          source={
-            dividerState === 'up' ? upImg :
-              dividerState === 'down' ? downImg :
-                dividerImg
-          }
-          style={{ width: 40, height: 10 }}
-          resizeMode="contain"
         />
       </View>
 
@@ -1165,6 +1043,7 @@ export default function CalendarScreen({ navigation }: any) {
                         color: event.color || (event.isHoliday ? '#FF6B6B' : '#0267FF'),
                         isHoliday: String(event.isHoliday || false),
                         country: event.country || '',
+                        bgImage: event.bgImage || '',
                       }
                     });
                   }}
@@ -1207,6 +1086,7 @@ export default function CalendarScreen({ navigation }: any) {
           ) : (
             <View style={{ alignItems: "center", paddingVertical: 0 }}>
               <Image
+                // source={theme === "dark" ? darkNoEventImg : lightNoEventImg}
                 source={isDarkMode ? darkNoEventImg : lightNoEventImg}
                 style={{ width: 200, height: 200, marginBottom: 0 }}
                 resizeMode="contain"
@@ -1222,7 +1102,6 @@ export default function CalendarScreen({ navigation }: any) {
           )}
         </View>
       </ScrollView>
-
       {/* FAB BUTTON */}
       <View style={{ position: "absolute", right: 30, bottom: 170 }}>
         <Animated.View
@@ -1233,6 +1112,7 @@ export default function CalendarScreen({ navigation }: any) {
           ]}
         />
         <TouchableOpacity
+          style={[styles.fab, { backgroundColor: colors.primary }]}
           onPress={() => {
             const dateToPass = selectedDate || getLocalDateString();
             router.push({
@@ -1251,7 +1131,7 @@ export default function CalendarScreen({ navigation }: any) {
           />
         </TouchableOpacity>
       </View>
-    </View >
+    </View>
   );
 }
 
@@ -1347,20 +1227,20 @@ const styles = StyleSheet.create({
     borderRadius: 28,
   },
   fab: {
-    width: 40,
-    height: 40,
+    width: 56,
+    height: 56,
     borderRadius: 28,
     justifyContent: "center",
     alignItems: "center",
+    elevation: 4,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 0 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
   },
   fabText: {
     fontSize: 40,
     color: '#FFFFFF',
-    justifyContent: "center",
     fontWeight: '300',
   },
   eventMenuContainer: {
