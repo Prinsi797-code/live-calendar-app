@@ -93,8 +93,8 @@ export const scheduleStreakWarningIfNeeded = async (): Promise<void> => {
     );
 
     const notifId = await scheduleLocalNotification(
-      '🔥 Streak tutne wali hai!',
-      `Aapki ${streak.count} din ki streak khatam ho jaegi! Aaj ka event abhi set karo.`,
+      '🔥 Your streak is about to end!',
+      `Your ${streak.count}-day streak will be lost! Set today's event now to keep it going.`,
       secondsUntil,
       { type: 'streak_warning' }
     );
@@ -143,8 +143,8 @@ export const scheduleOnboardingNotificationIfNeeded = async (): Promise<void> =>
     }
 
     const notifId = await scheduleLocalNotification(
-      '📅 Apna pehla event set karo!',
-      'Daily schedule banao, reminders set karo aur streak banake surprises pao! 🎁',
+      '📅 Set Your First Event!',
+      'Create your daily schedule, set reminders, and build your streak to unlock exciting surprises! 🎁',
       3600,
       { type: 'onboarding' }
     );

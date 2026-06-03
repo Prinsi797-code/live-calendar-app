@@ -2,7 +2,7 @@
   "expo": {
     "name": "Smart Calendar 2026",
     "slug": "calendarapp",
-    "version": "1.0.23",
+    "version": "1.0.25",
     "orientation": "portrait",
     "icon": "./assets/icons/logo.png",
     "owner": "docflow789",
@@ -12,7 +12,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.hevin.calendar2026",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryAddUsageDescription": "Used to save event images to your photo library.",

@@ -411,8 +411,10 @@
     "Addatleast": "Add at least 1 event per day to grow your streak",
     "Missingaday":"Missing a day resets your streak back to 0",
     "Reachmilestones":"Reach milestones: 7, 30, 100, and 365 days!",
+
+
     "streakstarted": "Streak Started",
-    
+       
     "today": "Today",
     "jan": "January",
     "feb": "February",

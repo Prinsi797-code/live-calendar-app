@@ -4,10 +4,11 @@ import { DrawerActions } from '@react-navigation/native';
 import * as Sentry from '@sentry/react-native';
 import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
-import { useNavigation, useRouter } from 'expo-router';
+import { useNavigation, usePathname, useRouter } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
 import * as StoreReview from 'expo-store-review';
 import LottieView from 'lottie-react-native';
+import { PostHogProvider, usePostHog } from 'posthog-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Animated, AppState, AppStateStatus, Image, InteractionManager, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -20,6 +21,8 @@ import OnboardingService from '../services/OnboardingService';
 import PurchaseManager from '../services/purchaseManager';
 import { initAnalytics, trackAppOpen, trackEvent, trackScreen } from '../utils/analytics';
 import { initializeI18n } from '../utils/i18n';
+
+
 import {
   getStreak, scheduleOnboardingNotificationIfNeeded,
   scheduleStreakWarningIfNeeded
@@ -222,8 +225,16 @@ function DrawerNavigator() {
   const [currentRouteName, setCurrentRouteName] = useState('');
   const [initComplete, setInitComplete] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const posthog = usePostHog();
+  const pathname = usePathname();
 
   const initStartedRef = useRef(false);
+
+  useEffect(() => {
+    if (pathname) {
+      posthog.screen(pathname);
+    }
+  }, [pathname]);
 
   useEffect(() => {
     const unsubscribe = navigation?.addListener?.('state', () => {
@@ -706,7 +717,7 @@ function CustomHeader() {
     console.log('📍 Header display year updated to:', themeYear);
   }, [themeYear]);
 
-  
+
   useEffect(() => {
     const loadStreak = async () => {
       const streak = await getStreak();
@@ -1123,16 +1134,21 @@ function ErrorFallbackWithTheme({
 
 function RootLayoutContent() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <Sentry.ErrorBoundary
-          fallback={(props) => <ErrorFallbackWithTheme {...props} />}
-          showDialog={false}
-        >
-          <DrawerNavigator />
-        </Sentry.ErrorBoundary>
-      </ThemeProvider>
-    </GestureHandlerRootView>
+    <PostHogProvider
+      apiKey="phc_wCLJcmT8nR92DzgssLYcs9WzFixWhRv4ibQAuY5wkoAn"
+      options={{ host: "https://us.i.posthog.com" }}
+    >
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ThemeProvider>
+          <Sentry.ErrorBoundary
+            fallback={(props) => <ErrorFallbackWithTheme {...props} />}
+            showDialog={false}
+          >
+            <DrawerNavigator />
+          </Sentry.ErrorBoundary>
+        </ThemeProvider>
+      </GestureHandlerRootView>
+    </PostHogProvider>
   );
 }
 
