@@ -87,9 +87,8 @@ function GlassTabButton({
   );
 }
 
-// bottomOffset = BANNER_HEIGHT when ad is showing, else 0
 function GlassTabBar({ state, navigation, descriptors, bottomOffset = 0 }: any) {
-  const { resolvedTheme, colors } = useTheme(); // ← colors add karo
+  const { resolvedTheme, colors } = useTheme();
   const isDark = resolvedTheme === 'dark' || resolvedTheme === 'custom';
 
 

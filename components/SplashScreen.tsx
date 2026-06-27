@@ -1,40 +1,20 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { Image, StyleSheet, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface SplashScreenProps {
   onFinish: () => void;
+  isAppReady?: boolean;
 }
 
-export default function SplashScreen({ onFinish }: SplashScreenProps) {
+export default function SplashScreen({ onFinish, isAppReady = false }: SplashScreenProps) {
   const { colors } = useTheme();
-  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
   useEffect(() => {
-    const minTimer = setTimeout(() => {
-      setMinTimeElapsed(true);
-    }, 2000);
-
-    const maxTimer = setTimeout(() => {
-      if (!minTimeElapsed) {
-        setMinTimeElapsed(true);
-      }
+    if (isAppReady) {
       onFinish();
-    }, 5000);
-
-    return () => {
-      clearTimeout(minTimer);
-      clearTimeout(maxTimer);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (minTimeElapsed) {
-      setTimeout(() => {
-        onFinish();
-      }, 100);
     }
-  }, [minTimeElapsed]);
+  }, [isAppReady]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -43,37 +23,11 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
         style={styles.logo}
         resizeMode="contain"
       />
-      
-      {/* <Text style={[styles.appName, { color: colors.textPrimary }]}>
-        Calendar App
-      </Text> */}
-
-      <ActivityIndicator 
-        size="large" 
-        color={colors.primary} 
-        style={styles.loader}
-      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logo: {
-    width: 120,
-    height: 120,
-    marginBottom: 24,
-  },
-  appName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 40,
-  },
-  loader: {
-    marginTop: 20,
-  },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  logo: { width: 120, height: 120 },
 });

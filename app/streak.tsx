@@ -14,7 +14,9 @@ import {
     View
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
-import { getStreak, isStreakRewardActive, StreakData } from '../utils/streakManager';
+import { isStreakRewardActive, RestoreData, StreakData } from '../utils/streakManager';
+
+import { checkAndRefreshStreak, restoreStreak } from '../utils/streakManager';
 
 const MILESTONES = [7, 30, 100, 365];
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -28,6 +30,13 @@ export default function StreakScreen() {
     const [streakStartDate, setStreakStartDate] = useState('');
     const [rewardDaysLeft, setRewardDaysLeft] = useState(0);
     const flameAnim = useRef(new Animated.Value(1)).current;
+
+    const [restoreAvailable, setRestoreAvailable] = useState(false);
+    const [restoreData, setRestoreData] = useState<RestoreData | null>(null);
+    const [restoreTimeLeft, setRestoreTimeLeft] = useState('');
+    const [isRestoring, setIsRestoring] = useState(false);
+    const [streakBlurred, setStreakBlurred] = useState(false);
+
 
     useEffect(() => {
         loadStreakData();
@@ -43,15 +52,44 @@ export default function StreakScreen() {
         ).start();
     };
 
+    useEffect(() => {
+        if (!restoreData) return;
+
+        const updateTimer = () => {
+            const now = new Date();
+            const end = new Date(restoreData.restoreWindowEnd);
+            const diff = end.getTime() - now.getTime();
+
+            if (diff <= 0) {
+                setRestoreAvailable(false);
+                setRestoreData(null);
+                setStreakBlurred(false);
+                loadStreakData(); // reload
+                return;
+            }
+
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            setRestoreTimeLeft(`${hours}h ${minutes}m`);
+        };
+
+        updateTimer();
+        const interval = setInterval(updateTimer, 60000);
+        return () => clearInterval(interval);
+    }, [restoreData]);
+
     const loadStreakData = async () => {
-        const current = await getStreak();
-        setStreak(current);
+        const result = await checkAndRefreshStreak();
+        setStreak(result.streak);
+        setRestoreAvailable(result.restoreAvailable);
+        setRestoreData(result.restoreData);
+        setStreakBlurred(result.restoreAvailable);
 
         const best = await AsyncStorage.getItem('best_streak');
         const bestVal = best ? parseInt(best) : 0;
-        if (current.count > bestVal) {
-            await AsyncStorage.setItem('best_streak', current.count.toString());
-            setBestStreak(current.count);
+        if (result.streak.count > bestVal && !result.restoreAvailable) {
+            await AsyncStorage.setItem('best_streak', result.streak.count.toString());
+            setBestStreak(result.streak.count);
         } else {
             setBestStreak(bestVal);
         }
@@ -61,6 +99,18 @@ export default function StreakScreen() {
 
         const reward = await isStreakRewardActive();
         setRewardDaysLeft(reward.daysLeft);
+    };
+
+    const handleRestore = async () => {
+        setIsRestoring(true);
+        const restoredCount = await restoreStreak();
+        if (restoredCount > 0) {
+            setRestoreAvailable(false);
+            setRestoreData(null);
+            setStreakBlurred(false);
+            await loadStreakData();
+        }
+        setIsRestoring(false);
     };
 
     const isToday = () => new Date().toISOString().split('T')[0] === streak.lastEventDate;
@@ -75,37 +125,47 @@ export default function StreakScreen() {
         const prev = MILESTONES[MILESTONES.indexOf(next) - 1] ?? 0;
         return Math.min(Math.max((streak.count - prev) / (next - prev), 0), 1);
     };
-
     const formatStartDate = () => {
         if (!streakStartDate) return '—';
-        const d = new Date(streakStartDate);
-        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    };
 
-    // Week bubbles — current week ke 7 din
+        const d = new Date(streakStartDate);
+
+        return d.toLocaleDateString('en-US', {
+            timeZone: 'UTC',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+        });
+    };
     const getWeekDays = () => {
         const today = new Date();
-        const dayOfWeek = today.getDay(); // 0 = Sunday
-        const sunday = new Date(today);
-        sunday.setDate(today.getDate() - dayOfWeek);
+        const dayOfWeek = today.getDay();
+        const todayStr = today.toISOString().split('T')[0];
 
         return Array.from({ length: 7 }, (_, i) => {
-            const d = new Date(sunday);
-            d.setDate(sunday.getDate() + i);
+            const d = new Date(today);
+            d.setDate(today.getDate() - dayOfWeek + i);
             const dateStr = d.toISOString().split('T')[0];
-            const todayStr = today.toISOString().split('T')[0];
-            const isStreakDay = streak.lastEventDate >= dateStr &&
-                streak.count > 0 &&
-                i <= dayOfWeek;
+
+            const lastDate = streak.lastEventDate;
+            const daysAgo = Math.floor(
+                (today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24)
+            );
+
+            const isFilled =
+                daysAgo >= 0 &&
+                daysAgo < streak.count &&
+                lastDate >= dateStr &&
+                streak.count > 0;
+
             return {
                 label: DAYS[i],
                 num: d.getDate(),
                 isToday: dateStr === todayStr,
-                isFilled: isStreakDay && dateStr <= (streak.lastEventDate || ''),
+                isFilled,
             };
         });
     };
-
     const progressPercent = getProgressPercent();
     const nextMilestone = getNextMilestone();
     const daysLeft = nextMilestone - streak.count;
@@ -127,52 +187,86 @@ export default function StreakScreen() {
             </View>
 
             <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-
-                {/* ── Main flame card ── */}
                 <View style={[styles.mainCard, { backgroundColor: colors.cardBackground }]}>
                     <Animated.Text style={[styles.flameEmoji, { transform: [{ scale: flameAnim }] }]}>
-                        🔥
+                        {restoreAvailable ? '🥺' : '🔥'}
                     </Animated.Text>
-                    <Text style={[styles.streakCount, { color: '#FF5252' }]}>
-                        {streak.count}
-                    </Text>
+
+                    {/* Blurred streak count */}
+                    <View style={{ alignItems: 'center' }}>
+                        <Text style={[
+                            styles.streakCount,
+                            { color: '#FF5252' },
+                            streakBlurred && {
+                                opacity: 0.2,
+                                // blur effect
+                                textShadowColor: '#FF5252',
+                                textShadowRadius: 20,
+                            }
+                        ]}>
+                            {streak.count}
+                        </Text>
+                        {streakBlurred && (
+                            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
+                                <Text style={{ fontSize: 32 }}>🔒</Text>
+                            </View>
+                        )}
+                    </View>
+
                     <Text style={[styles.streakLabel, { color: colors.textSecondary }]}>
                         {t("DayStreak")}
                     </Text>
 
-                    <View style={[styles.statusPill, { backgroundColor: isToday() ? '#E05C2A18' : '#88888818' }]}>
-                        <View style={[styles.statusDot, { backgroundColor: isToday() ? '#FF5252' : '#888' }]} />
-                        <Text style={[styles.statusText, { color: isToday() ? '#FF5252' : colors.textSecondary }]}>
-                            {isToday() ? t('Eventaddedtoday') : t('keepstreak')}
-                        </Text>
-                    </View>
+                    {/* Normal status pill */}
+                    {!restoreAvailable && (
+                        <View style={[styles.statusPill, { backgroundColor: isToday() ? '#E05C2A18' : '#88888818' }]}>
+                            <View style={[styles.statusDot, { backgroundColor: isToday() ? '#FF5252' : '#888' }]} />
+                            <Text style={[styles.statusText, { color: isToday() ? '#FF5252' : colors.textSecondary }]}>
+                                {isToday() ? t('Eventaddedtoday') : t('keepstreak')}
+                            </Text>
+                        </View>
+                    )}
 
-                    {/* Week calendar */}
-                    <View style={styles.weekRow}>
-                        {weekDays.map((day, i) => (
-                            <View key={i} style={styles.dayCol}>
-                                <Text style={[styles.dayLabel, { color: colors.textSecondary }]}>{day.label}</Text>
-                                <View style={[
-                                    styles.dayBubble,
-                                    day.isFilled && styles.dayBubbleFilled,
-                                    day.isToday && !day.isFilled && { borderWidth: 2, borderColor: '#FF5252', backgroundColor: 'transparent' },
-                                ]}>
-                                    <Text style={[
-                                        styles.dayNum,
-                                        { color: day.isFilled ? '#fff' : day.isToday ? '#FF5252' : colors.textSecondary },
-                                    ]}>
-                                        {day.num}
-                                    </Text>
-                                </View>
-                            </View>
-                        ))}
-                    </View>
+                    {/* Restore Banner */}
+                    {restoreAvailable && restoreData && (
+                        <View style={{
+                            width: '100%',
+                            backgroundColor: '#FF525215',
+                            borderRadius: 16,
+                            padding: 14,
+                            marginTop: 8,
+                            alignItems: 'center',
+                            gap: 10,
+                            borderWidth: 1,
+                            borderColor: '#FF525240',
+                        }}>
+                            <Text style={{ fontSize: 13, color: '#FF5252', fontWeight: '600', textAlign: 'center' }}>
+                                😢 You broke your {restoreData.savedCount}-day streak!
+                            </Text>
+                            <Text style={{ fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>
+                                Restore it before it's gone! ⏰ {restoreTimeLeft} left
+                            </Text>
+                            <TouchableOpacity
+                                onPress={handleRestore}
+                                disabled={isRestoring}
+                                style={{
+                                    backgroundColor: '#FF5252',
+                                    paddingHorizontal: 24,
+                                    paddingVertical: 10,
+                                    borderRadius: 20,
+                                    opacity: isRestoring ? 0.7 : 1,
+                                }}
+                            >
+                                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>
+                                    {isRestoring ? 'Restoring...' : `🔥 Restore ${restoreData.savedCount}-Day Streak`}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </View>
 
-                {/* ── Info row ── */}
                 <View style={styles.infoRow}>
                     <View style={[styles.infoCard, { backgroundColor: colors.cardBackground }]}>
-                        {/* <Text style={styles.infoEmoji}>🏆</Text> */}
                         <Image
                             source={require('../assets/images/winner.png')}
                             style={{ width: 28, height: 28, marginBottom: 2 }}
@@ -193,7 +287,6 @@ export default function StreakScreen() {
 
                 </View>
 
-                {/* ── Progress card ── */}
                 <View style={[styles.progressCard, { backgroundColor: colors.cardBackground }]}>
                     <View style={styles.progressHeader}>
                         <Text style={[styles.progressTitle, { color: colors.textPrimary }]}>{t("NextMilestone")}</Text>
@@ -226,7 +319,6 @@ export default function StreakScreen() {
                     </View>
                 </View>
 
-                {/* ── 7-day Reward card ── */}
                 <View style={[styles.rewardCard, {
                     backgroundColor: rewardDaysLeft > 0 ? '#22c55e12' : '#E05C2A0D',
                     borderColor: rewardDaysLeft > 0 ? '#22c55e40' : '#E05C2A30',
@@ -240,21 +332,21 @@ export default function StreakScreen() {
                         <Text style={[styles.rewardTitle, {
                             color: rewardDaysLeft > 0 ? '#166534' : '#FF5252',
                         }]}>
-                            {rewardDaysLeft > 0 ? 'Reward active!' : '7-day streak reward'}
+                            {rewardDaysLeft > 0 ? t('Rewardactive') : t('streakreward')}
                         </Text>
                         <Text style={[styles.rewardSub, {
                             color: rewardDaysLeft > 0 ? '#15803d' : '#FF5252',
                         }]}>
                             {rewardDaysLeft > 0
-                                ? `Background images unlocked — ${rewardDaysLeft} days left`
-                                : `Reach 7 days — background images free for 7 days!`}
+                                ? `${t('Backgroundimages')} + 💪 ${t('Challengesunlocked')} — ${rewardDaysLeft} ${t('daysleft')}`
+                                : t('Reach7days')}
                         </Text>
                     </View>
                     <View style={[styles.rewardBadge, {
                         backgroundColor: rewardDaysLeft > 0 ? '#22c55e' : '#FF5252',
                     }]}>
                         <Text style={styles.rewardBadgeText}>
-                            {rewardDaysLeft > 0 ? `FREE ${rewardDaysLeft}d` : '7d'}
+                            {rewardDaysLeft > 0 ? `${t('FREE')} ${rewardDaysLeft}d` : '7d'}
                         </Text>
                     </View>
                 </View>
@@ -295,8 +387,6 @@ const styles = StyleSheet.create({
     },
     headerTitle: { fontSize: 20, fontWeight: '600', textAlign: 'center' },
     scroll: { padding: 16, gap: 12, paddingBottom: 40 },
-
-    // Main card
     mainCard: { borderRadius: 20, padding: 24, alignItems: 'center', gap: 6 },
     flameEmoji: { fontSize: 64 },
     streakCount: { fontSize: 68, fontWeight: '800', lineHeight: 72 },
@@ -308,8 +398,6 @@ const styles = StyleSheet.create({
     },
     statusDot: { width: 7, height: 7, borderRadius: 4 },
     statusText: { fontSize: 13, fontWeight: '600' },
-
-    // Week calendar
     weekRow: {
         flexDirection: 'row',
         gap: 4,
@@ -327,8 +415,6 @@ const styles = StyleSheet.create({
     },
     dayBubbleFilled: { backgroundColor: '#E05C2A', borderColor: '#E05C2A' },
     dayNum: { fontSize: 13, fontWeight: '500' },
-
-    // Info row
     infoRow: { flexDirection: 'row', gap: 10 },
     infoCard: {
         flex: 1, borderRadius: 14, padding: 14,
@@ -337,8 +423,6 @@ const styles = StyleSheet.create({
     infoEmoji: { fontSize: 24, marginBottom: 2 },
     infoVal: { fontSize: 16, fontWeight: '700' },
     infoLbl: { fontSize: 12 },
-
-    // Progress
     progressCard: { borderRadius: 16, padding: 16, gap: 10 },
     progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     progressTitle: { fontSize: 15, fontWeight: '700' },
@@ -354,8 +438,6 @@ const styles = StyleSheet.create({
     },
     milestoneLock: { fontSize: 20 },
     milestoneLabel: { fontSize: 11, fontWeight: '600' },
-
-    // Reward card
     rewardCard: {
         borderRadius: 16, borderWidth: 0.5,
         padding: 14, flexDirection: 'row',
@@ -372,8 +454,6 @@ const styles = StyleSheet.create({
         borderRadius: 20, flexShrink: 0,
     },
     rewardBadgeText: { color: '#fff', fontSize: 11, fontWeight: '600' },
-
-    // How it works
     howCard: { borderRadius: 16, padding: 16, gap: 12 },
     howTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
     howRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },

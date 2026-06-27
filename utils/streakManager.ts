@@ -6,6 +6,8 @@ const INSTALL_TIME_KEY = 'app_install_time';
 const STREAK_NOTIF_KEY = 'streak_warning_notification_id';
 const ONBOARDING_NOTIF_KEY = 'onboarding_notification_id';
 const STREAK_REWARD_KEY = 'streak_reward_unlocked_date';
+const STREAK_RESTORE_KEY = 'streak_restore_data';
+
 
 export interface StreakData {
   count: number;
@@ -24,10 +26,22 @@ export const getStreak = async (): Promise<StreakData> => {
   }
 };
 
+export interface RestoreData {
+  savedCount: number;
+  savedStartDate: string;
+  restoreWindowStart: string;
+  restoreWindowEnd: string;
+}
+
 export const updateStreakOnEventSave = async (): Promise<number> => {
   try {
     const today = getTodayString();
     const streak = await getStreak();
+
+    console.log('=== STREAK DEBUG ===');
+    console.log('Today:', today);
+    console.log('Last event date:', streak.lastEventDate);
+    console.log('Current count:', streak.count);
 
     if (streak.lastEventDate === today) {
       await cancelStreakWarningNotification();
@@ -41,25 +55,209 @@ export const updateStreakOnEventSave = async (): Promise<number> => {
     const newCount =
       streak.lastEventDate === yesterdayString ? streak.count + 1 : 1;
 
+    console.log('New count:', newCount);
+    console.log('===================');
+
     const newStreak: StreakData = { count: newCount, lastEventDate: today };
     await AsyncStorage.setItem(STREAK_KEY, JSON.stringify(newStreak));
+
+    const best = await AsyncStorage.getItem('best_streak');
+    const bestVal = best ? parseInt(best) : 0;
+
+    if (newCount > bestVal) {
+      await AsyncStorage.setItem('best_streak', newCount.toString());
+    }
 
     await cancelStreakWarningNotification();
     await cancelOnboardingNotification();
 
     if (newCount === 1) {
-      await AsyncStorage.setItem('streak_start_date', today);
+      const pendingRestore = await AsyncStorage.getItem(STREAK_RESTORE_KEY);
+      if (!pendingRestore) {
+        await AsyncStorage.setItem('streak_start_date', today);
+      }
     }
-
     if (newCount === 7) {
       await AsyncStorage.setItem(STREAK_REWARD_KEY, new Date().toISOString());
-      console.log('🎉 7-day streak! Background images unlocked for 7 days!');
-    }
+      await AsyncStorage.setItem('streak_challenge_reward_unlocked', new Date().toISOString());
 
+      await scheduleCongratulationsNotification(newCount);
+    }
+    if ([30, 100, 365].includes(newCount)) {
+      await scheduleCongratulationsNotification(newCount);
+    }
     console.log('🔥 Streak updated:', newCount);
     return newCount;
   } catch {
     return 0;
+  }
+};
+
+export const getRestoreData = async (): Promise<RestoreData | null> => {
+  try {
+    const raw = await AsyncStorage.getItem(STREAK_RESTORE_KEY);
+    if (!raw) return null;
+    const data: RestoreData = JSON.parse(raw);
+
+    const now = new Date();
+    const windowEnd = new Date(data.restoreWindowEnd);
+
+    if (now > windowEnd) {
+      await AsyncStorage.removeItem(STREAK_RESTORE_KEY);
+      return null;
+    }
+
+    return data;
+  } catch {
+    return null;
+  }
+};
+
+export const checkAndRefreshStreak = async (): Promise<{
+  streak: StreakData;
+  restoreAvailable: boolean;
+  restoreData: RestoreData | null;
+}> => {
+  try {
+    const streak = await getStreak();
+
+    const existingRestore = await getRestoreData();
+    if (existingRestore) {
+      return {
+        streak,
+        restoreAvailable: true,
+        restoreData: existingRestore,
+      };
+    }
+
+    if (streak.count === 0 || !streak.lastEventDate) {
+      return { streak, restoreAvailable: false, restoreData: null };
+    }
+
+    const today = getTodayString();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    if (streak.lastEventDate === today || streak.lastEventDate === yesterdayStr) {
+      return { streak, restoreAvailable: false, restoreData: null };
+    }
+
+    const now = new Date();
+    const restoreEnd = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+    const lastDate = new Date(streak.lastEventDate);
+    const daysSinceLastEvent = Math.floor(
+      (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    if (daysSinceLastEvent > 2) {
+      const resetStreak: StreakData = { count: 0, lastEventDate: streak.lastEventDate };
+      await AsyncStorage.setItem(STREAK_KEY, JSON.stringify(resetStreak));
+      return { streak: resetStreak, restoreAvailable: false, restoreData: null };
+    }
+
+    const savedStartDate = await AsyncStorage.getItem('streak_start_date') || '';
+    const restoreData: RestoreData = {
+      savedCount: streak.count,
+      savedStartDate,
+      restoreWindowStart: now.toISOString(),
+      restoreWindowEnd: restoreEnd.toISOString(),
+    };
+    await AsyncStorage.setItem(STREAK_RESTORE_KEY, JSON.stringify(restoreData));
+
+    return {
+      streak,
+      restoreAvailable: true,
+      restoreData,
+    };
+
+  } catch {
+    return {
+      streak: { count: 0, lastEventDate: '' },
+      restoreAvailable: false,
+      restoreData: null,
+    };
+  }
+};
+
+export const restoreStreak = async (): Promise<number> => {
+  try {
+    const restoreData = await getRestoreData();
+    if (!restoreData) return 0;
+
+    const today = getTodayString();
+
+    const restoredStreak: StreakData = {
+      count: restoreData.savedCount,
+      lastEventDate: today,
+    };
+    await AsyncStorage.setItem(STREAK_KEY, JSON.stringify(restoredStreak));
+
+    await AsyncStorage.setItem('streak_start_date', restoreData.savedStartDate);
+
+    const best = await AsyncStorage.getItem('best_streak');
+    const bestVal = best ? parseInt(best) : 0;
+    if (restoreData.savedCount > bestVal) {
+      await AsyncStorage.setItem('best_streak', restoreData.savedCount.toString());
+    }
+    await AsyncStorage.removeItem(STREAK_RESTORE_KEY);
+
+    console.log('✅ Streak restored:', restoreData.savedCount);
+    return restoreData.savedCount;
+  } catch {
+    return 0;
+  }
+};
+
+const scheduleCongratulationsNotification = async (streakCount: number): Promise<void> => {
+  try {
+    let title = '';
+    let body = '';
+    if (streakCount === 7) {
+      title = '🎉 7-Day Streak! You did it!';
+      body = 'Amazing! You\'ve unlocked 2 premium features FREE for 7 days: Background Images & Challenges! Keep it up! 🔥';
+    } else if (streakCount === 30) {
+      title = '🏆 30-Day Streak Legend!';
+      body = 'One month of consistency! You\'re absolutely crushing it! 🔥';
+    } else if (streakCount === 100) {
+      title = '💯 100-Day Streak! Incredible!';
+      body = 'You\'re in the top 1% of users! Unbelievable dedication! 🔥🔥🔥';
+    } else if (streakCount === 365) {
+      title = '👑 365-Day Streak! A FULL YEAR!';
+      body = 'You are a true champion. One full year of daily events. Extraordinary! 🔥';
+    }
+    if (!title) return;
+    await scheduleLocalNotification(title, body, 5, {
+      type: 'streak_milestone',
+      streakCount,
+    });
+
+    console.log(`🎉 Congratulations notification scheduled for ${streakCount}-day streak`);
+  } catch (e) {
+    console.error('Error scheduling congratulations notification:', e);
+  }
+};
+
+export const isChallengeRewardActive = async (): Promise<{ active: boolean; daysLeft: number }> => {
+  try {
+    const existing = await AsyncStorage.getItem('streak_challenge_reward_unlocked');
+    if (!existing) return { active: false, daysLeft: 0 };
+
+    const unlockedDate = new Date(existing);
+    const now = new Date();
+    const daysDiff = Math.floor(
+      (now.getTime() - unlockedDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    if (daysDiff < 7) {
+      return { active: true, daysLeft: 7 - daysDiff };
+    }
+
+    await AsyncStorage.removeItem('streak_challenge_reward_unlocked');
+    return { active: false, daysLeft: 0 };
+  } catch {
+    return { active: false, daysLeft: 0 };
   }
 };
 
@@ -69,7 +267,7 @@ export const scheduleStreakWarningIfNeeded = async (): Promise<void> => {
     const streak = await getStreak();
 
     if (streak.lastEventDate === today) {
-      console.log('✅ Aaj event save hai, streak warning nahi chahiye');
+      console.log('Aaj event save hai, streak warning nahi chahiye');
       return;
     }
 
@@ -193,13 +391,11 @@ export const checkAndGrantStreakReward = async (streakCount: number): Promise<bo
         return false;
       }
     }
-
     if (streakCount === 7) {
       await AsyncStorage.setItem(STREAK_REWARD_KEY, new Date().toISOString());
       console.log('🎉 7-day streak reward granted!');
       return true;
     }
-
     return false;
   } catch {
     return false;
@@ -216,11 +412,9 @@ export const isStreakRewardActive = async (): Promise<{ active: boolean; daysLef
     const daysDiff = Math.floor(
       (now.getTime() - unlockedDate.getTime()) / (1000 * 60 * 60 * 24)
     );
-
     if (daysDiff < 7) {
       return { active: true, daysLeft: 7 - daysDiff };
     }
-
     await AsyncStorage.removeItem(STREAK_REWARD_KEY);
     return { active: false, daysLeft: 0 };
   } catch {

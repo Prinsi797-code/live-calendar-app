@@ -13,6 +13,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Animated, AppState, AppStateStatus, Image, InteractionManager, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import AppSplashScreen from '../components/SplashScreen';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import AdsManager from '../services/adsManager';
 import LocationService from '../services/LocationService';
@@ -21,14 +22,10 @@ import OnboardingService from '../services/OnboardingService';
 import PurchaseManager from '../services/purchaseManager';
 import { initAnalytics, trackAppOpen, trackEvent, trackScreen } from '../utils/analytics';
 import { initializeI18n } from '../utils/i18n';
-
-
 import {
-  getStreak, scheduleOnboardingNotificationIfNeeded,
+  checkAndRefreshStreak, getStreak, scheduleOnboardingNotificationIfNeeded,
   scheduleStreakWarningIfNeeded
 } from '../utils/streakManager';
-
-
 
 // Initialize Sentry - Only in Production
 Sentry.init({
@@ -88,13 +85,17 @@ function SplashScreen({ onComplete, skipAd = false }: { onComplete: () => void; 
   }, []);
 
   useEffect(() => {
+    checkAndRefreshStreak();
+  }, []);
+
+  useEffect(() => {
     const loadAndShowAd = async () => {
       try {
         console.log('Splash Screen: Initializing ads...');
         setAdStatus('Loading ads...');
 
         if (skipAd) {
-          console.log('⏭️ Skipping splash ad (opened from notification)');
+          console.log('Skipping splash ad (opened from notification)');
           if (!completedRef.current) {
             completedRef.current = true;
             setTimeout(onComplete, 100);
@@ -168,7 +169,6 @@ function SplashScreen({ onComplete, skipAd = false }: { onComplete: () => void; 
         logError(error, 'Splash Screen Ad Error');
         setAdStatus('Ad error');
 
-        // Continue even if ad fails
         if (!completedRef.current) {
           completedRef.current = true;
           setTimeout(onComplete, 500);
@@ -217,7 +217,7 @@ function DrawerNavigator() {
   const router = useRouter();
   const navigation = useNavigation();
   const [isReady, setIsReady] = useState(false);
-  const [showSplashAd, setShowSplashAd] = useState(true);
+  const [showSplashAd, setShowSplashAd] = useState(false);
   const [shouldShowLanguage, setShouldShowLanguage] = useState(false);
   const [openedFromNotification, setOpenedFromNotification] = useState(false);
   const [initialRoute, setInitialRoute] = useState<any>(null);
@@ -226,6 +226,7 @@ function DrawerNavigator() {
   const [initComplete, setInitComplete] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const posthog = usePostHog();
+  const [splashFinished, setSplashFinished] = useState(false);
   const pathname = usePathname();
 
   const initStartedRef = useRef(false);
@@ -434,7 +435,7 @@ function DrawerNavigator() {
         });
 
         if (isFromNotification) {
-          // ✅ Flag set karo
+
           await AsyncStorage.setItem('opened_from_notification', 'true');
 
           const notificationData = lastNotification.notification.request.content.data;
@@ -449,6 +450,7 @@ function DrawerNavigator() {
             setOpenedFromNotification(true);
             setShowSplashAd(false);
             setIsReady(true);
+            handleSplashComplete();
             return;
           }
         }
@@ -479,6 +481,7 @@ function DrawerNavigator() {
           }
 
           setIsReady(true);
+          handleSplashComplete();
           return;
         }
 
@@ -491,10 +494,12 @@ function DrawerNavigator() {
 
         console.log('App initialization complete - will show splash ad');
         setIsReady(true);
+        handleSplashComplete();
 
       } catch (error) {
         logError(error, 'Error initializing app');
         setIsReady(true);
+        handleSplashComplete();
       }
     };
 
@@ -611,20 +616,34 @@ function DrawerNavigator() {
     }
   }, [isReady, showSplashAd, shouldShowLanguage, router, openedFromNotification]);
 
-  if (!isReady || showSplashAd) {
-    console.log('⏳ Showing splash...', { isReady, showSplashAd, openedFromNotification });
+  // if (!isReady || showSplashAd) {
+  //   console.log('⏳ Showing splash...', { isReady, showSplashAd, openedFromNotification });
 
-    if (openedFromNotification && !showSplashAd) {
-      return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      );
-    }
-    return <SplashScreen onComplete={handleSplashComplete} skipAd={openedFromNotification} />;
+  //   if (openedFromNotification && !showSplashAd) {
+  //     return (
+  //       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+  //         <ActivityIndicator size="large" color={colors.primary} />
+  //       </View>
+  //     );
+  //   }
+  //   return <SplashScreen onComplete={handleSplashComplete} skipAd={openedFromNotification} />;
+  // }
+  // if (!isReady) {
+  //   return (
+  //     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+  //       <ActivityIndicator size="large" color={colors.primary} />
+  //     </View>
+  //   );
+  // }
+
+  if (!splashFinished) {
+    return (
+      <AppSplashScreen
+        onFinish={() => setSplashFinished(true)}
+        isAppReady={isReady}
+      />
+    );
   }
-  console.log('Rendering main app - Splash fully dismissed');
-
   return (
     <>
       <Drawer

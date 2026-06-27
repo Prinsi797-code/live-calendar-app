@@ -26,7 +26,6 @@ const firebaseConfig = {
   measurementId: "G-PSLGEMZW9G"
 };
 
-// Initialize Firebase Only Once
 let app;
 
 if (!getApps().length) {

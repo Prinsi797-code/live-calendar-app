@@ -4,8 +4,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Localization from 'expo-localization';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from "react-i18next";
+import { Animated } from 'react-native';
+
 import {
     ActivityIndicator,
     Alert,
@@ -33,7 +35,10 @@ import { useScreenTracking } from '../../hooks/useScreenTracking';
 import AdsManager from '../../services/adsManager';
 import NotificationService from '../../services/NotificationService';
 import PurchaseManager from '../../services/purchaseManager';
-import { isStreakRewardActive } from '../../utils/streakManager';
+// import { isStreakRewardActive } from '../../utils/streakManager';
+import { isChallengeRewardActive, isStreakRewardActive } from '../../utils/streakManager';
+
+
 
 const iconOptions = [
     '💪', '🗑️', '💣', '🎨', '☕', '🔧',
@@ -50,6 +55,7 @@ export default function NewChallengeScreen() {
     const [toastMessage, setToastMessage] = useState('');
     const params = useLocalSearchParams();
     const [showPremiumModal, setShowPremiumModal] = useState(false);
+    const [challengeRewardDaysLeft, setChallengeRewardDaysLeft] = useState(0);
     const isEditMode = !!params.id;
     useScreenTracking('new_challenge_screen');
 
@@ -58,10 +64,9 @@ export default function NewChallengeScreen() {
         now.setMinutes(now.getMinutes() + 10);
         return now;
     };
+    const pulseAnim = useRef(new Animated.Value(1)).current;
 
-    // Determine initial values based on params
     const getInitialValues = () => {
-        // If no title and icon in params, use defaults (Create your own scenario)
         const shouldUseDefaults = !params.title && !params.icon && !isEditMode;
 
         return {
@@ -120,7 +125,6 @@ export default function NewChallengeScreen() {
             setToastVisible(true);
         }
     };
-
     useEffect(() => {
         const detectTimeFormat = async () => {
             try {
@@ -357,19 +361,46 @@ export default function NewChallengeScreen() {
     const [rewardDaysLeft, setRewardDaysLeft] = useState(0);
 
     useEffect(() => {
+        if (rewardDaysLeft > 0) {
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(pulseAnim, {
+                        toValue: 1.04,
+                        duration: 800,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(pulseAnim, {
+                        toValue: 1,
+                        duration: 800,
+                        useNativeDriver: true,
+                    }),
+                ])
+            ).start();
+        }
+    }, [rewardDaysLeft]);
+
+
+
+    useEffect(() => {
         const checkReward = async () => {
             const reward = await isStreakRewardActive();
             setRewardDaysLeft(reward.daysLeft);
+            const challengeReward = await isChallengeRewardActive();
+            if (challengeReward.daysLeft > reward.daysLeft) {
+                setRewardDaysLeft(challengeReward.daysLeft);
+            }
         };
         checkReward();
     }, []);
 
-    // Helper — premium ya reward dono se access milega
     const hasChallengeAccess = async () => {
         const isPremium = await PurchaseManager.isPremium();
         if (isPremium) return true;
-        const reward = await isStreakRewardActive();
-        return reward.active;
+
+        const bgReward = await isStreakRewardActive();
+        const challengeReward = await isChallengeRewardActive();
+
+        return bgReward.active || challengeReward.active;
     };
 
     const handleSave = async () => {
@@ -623,7 +654,7 @@ export default function NewChallengeScreen() {
                                     {isEditMode ? t('save') : t('save')}
                                 </Text>
                                 {/* Streak reward badge */}
-                                {rewardDaysLeft > 0 && (
+                                {/* {rewardDaysLeft > 0 && (
                                     <View style={{
                                         backgroundColor: '#22c55e',
                                         paddingHorizontal: 6,
@@ -635,11 +666,70 @@ export default function NewChallengeScreen() {
                                             FREE {rewardDaysLeft}d
                                         </Text>
                                     </View>
-                                )}
+                                )} */}
                             </View>
                         )}
                     </TouchableOpacity>
                 </View>
+                {/* Reward Banner - shown below header when streak reward is active */}
+                {rewardDaysLeft > 0 && (
+                    <Animated.View
+                        style={{
+                            transform: [{ scale: pulseAnim }],
+                            marginHorizontal: 16,
+                            marginTop: 10,
+                            marginBottom: 4,
+                            borderRadius: 14,
+                            overflow: 'hidden',
+                        }}
+                    >
+                        <View
+                            style={{
+                                background: 'linear-gradient(135deg, #16a34a, #22c55e)',
+                                backgroundColor: '#16a34a',
+                                borderRadius: 14,
+                                paddingVertical: 12,
+                                paddingHorizontal: 16,
+                                flexDirection: 'row',
+                                gap: 10,
+                            }}
+                        >
+                            <Text style={{ fontSize: 26, marginTop:5 }}>🎉</Text>
+                            <View style={{ flex: 1, justifyContent: 'center', }}>
+                                <Text style={{
+                                    color: '#fff',
+                                    fontSize: 13,
+                                    fontWeight: '800',
+                                    letterSpacing: 0.3,
+                                    alignContent: 'center',
+                                    marginTop: 5,
+                                }}>
+                                    {t('Congratulations')}
+                                </Text>
+                                <Text style={{
+                                    color: '#bbf7d0',
+                                    fontSize: 11,
+                                    fontWeight: '500',
+                                    lineHeight: 15,
+                                }}>
+                                </Text>
+                            </View>
+
+                            <View style={{
+                                backgroundColor: '#15803d',
+                                borderRadius: 8,
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                alignItems: 'center',
+                            }}>
+                                <Text style={{ color: '#4ade80', fontSize: 9, fontWeight: '700' }}>{t('FREE')}</Text>
+                                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '900', lineHeight: 16 }}>
+                                    {rewardDaysLeft}d
+                                </Text>
+                            </View>
+                        </View>
+                    </Animated.View>
+                )}
 
                 <ScrollView style={styles.content}>
                     <View style={styles.titleSection}>
