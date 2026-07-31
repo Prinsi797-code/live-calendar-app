@@ -98,9 +98,18 @@ export default function EatHealthyScreen() {
         position: string;
     } | null>(null);
 
+    // useEffect(() => {
+    //     const config = AdsManager.getBannerConfig('home');
+    //     setBannerConfig(config);
+    // }, []);
+
     useEffect(() => {
-        const config = AdsManager.getBannerConfig('home');
-        setBannerConfig(config);
+        const loadBannerConfig = async () => {
+            const config = await AdsManager.getBannerConfig('main');
+            console.log('weird screen banner config:', config);
+            setBannerConfig(config);
+        };
+        loadBannerConfig();
     }, []);
 
 

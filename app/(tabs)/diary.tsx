@@ -7,11 +7,13 @@ import {
   Alert,
   Animated,
   Image,
+  Modal,
   Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   ToastAndroid,
   TouchableOpacity,
   View
@@ -29,6 +31,7 @@ interface Diary {
   location: string;
   url: string;
   completed: boolean;
+  passwordProtected?: boolean;
 }
 
 export default function DiaryScreen() {
@@ -151,11 +154,29 @@ export default function DiaryScreen() {
       setSelectionMode(false);
     }
   };
+  const [openPasswordCheckVisible, setOpenPasswordCheckVisible] = useState(false);
+  const [openPasswordCheckInput, setOpenPasswordCheckInput] = useState('');
+  const [openPasswordCheckError, setOpenPasswordCheckError] = useState('');
+  const [pendingDiaryItem, setPendingDiaryItem] = useState<Diary | null>(null);
+
+  const getDiaryPasswordKey = (id: string) => `diary_password_${id}`;
+  const getDiaryPassword = async (id: string): Promise<string | null> => {
+    return await AsyncStorage.getItem(getDiaryPasswordKey(id));
+  };
 
   const handleCardPress = (diaryItem?: Diary) => {
     if (selectionMode && diaryItem) {
       handleSelectToggle(diaryItem.id);
-    } else if (diaryItem) {
+      return;
+    }
+    if (diaryItem) {
+      if (diaryItem.passwordProtected) {
+        setPendingDiaryItem(diaryItem);
+        setOpenPasswordCheckInput('');
+        setOpenPasswordCheckError('');
+        setOpenPasswordCheckVisible(true);
+        return;
+      }
       router.push({
         pathname: '/diary/diaryDetails',
         params: { id: diaryItem.id }
@@ -165,35 +186,20 @@ export default function DiaryScreen() {
     }
   };
 
-  // const handleDelete = async () => {
-  //   Alert.alert(
-  //     t('delete_diary'),
-  //     t('are_sure_diary_entries', { count: selectedIds.size }),
-  //     [
-  //       {
-  //         text: t('cancel'),
-  //         style: 'cancel',
-  //       },
-  //       {
-  //         text: t('delete'),
-  //         style: 'destructive',
-  //         onPress: async () => {
-  //           try {
-  //             const updatedDiary = diary.filter(
-  //               (item) => !selectedIds.has(item.id)
-  //             );
-  //             setDiary(updatedDiary);
-  //             await AsyncStorage.setItem('diarys', JSON.stringify(updatedDiary));
-  //             setSelectionMode(false);
-  //             setSelectedIds(new Set());
-  //           } catch (error) {
-  //             console.error('Error deleting diary:', error);
-  //           }
-  //         },
-  //       },
-  //     ]
-  //   );
-  // };
+  const handleConfirmOpenPassword = async () => {
+    if (!pendingDiaryItem) return;
+    const savedPassword = await getDiaryPassword(pendingDiaryItem.id);
+    if (openPasswordCheckInput !== savedPassword) {
+      setOpenPasswordCheckError('Incorrect password.');
+      return;
+    }
+    setOpenPasswordCheckVisible(false);
+    router.push({
+      pathname: '/diary/diaryDetails',
+      params: { id: pendingDiaryItem.id }
+    });
+    setPendingDiaryItem(null);
+  };
 
   const handleDelete = async () => {
     Alert.alert(
@@ -370,9 +376,7 @@ export default function DiaryScreen() {
                     onLongPress={() => handleLongPress(diaryItem.id)}
                     delayLongPress={500}
                   >
-                    <View
-                      style={[styles.leftLine]}
-                    />
+                    <View style={[styles.leftLine]} />
                     <View style={styles.iconContainer}>
                       <Text style={styles.emojiIcon}>{diaryItem.icon || '📖'}</Text>
                     </View>
@@ -381,10 +385,11 @@ export default function DiaryScreen() {
                       <Text style={[styles.challengeTitle, { color: colors.textPrimary }]} numberOfLines={1}>
                         {diaryItem.title}
                       </Text>
-                      {/* <Text style={[styles.challengeDate, { color: colors.textSecondary }]}>
-                        {formatDate(diaryItem.Date)}
-                      </Text> */}
                     </View>
+
+                    {diaryItem.passwordProtected && (
+                      <Feather name="lock" size={16} color={colors.textTertiary} style={{ marginRight: 8 }} />
+                    )}
 
                     {diaryItem.completed && (
                       <View style={styles.completedBadge}>
@@ -419,6 +424,32 @@ export default function DiaryScreen() {
               />
             </TouchableOpacity>
           </View>
+
+          <Modal visible={openPasswordCheckVisible} transparent animationType="fade" onRequestClose={() => setOpenPasswordCheckVisible(false)}>
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalBox, { backgroundColor: colors.cardBackground }]}>
+                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>{t('EnterPassword')}</Text>
+                <TextInput
+                  style={[styles.modalInput, { color: colors.textPrimary, borderColor: colors.border }]}
+                  placeholder="Password"
+                  placeholderTextColor={colors.textTertiary}
+                  secureTextEntry
+                  value={openPasswordCheckInput}
+                  onChangeText={setOpenPasswordCheckInput}
+                  autoFocus
+                />
+                {!!openPasswordCheckError && <Text style={{ color: '#FF6B6B', marginBottom: 8 }}>{openPasswordCheckError}</Text>}
+                <View style={styles.modalButtonRow}>
+                  <TouchableOpacity style={styles.modalButton} onPress={() => setOpenPasswordCheckVisible(false)}>
+                    <Text style={{ color: colors.textSecondary }}>{t('cancel')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={handleConfirmOpenPassword}>
+                    <Text style={{ color: '#fff', fontWeight: '700' }}>{t('Unlock')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
         </SafeAreaView>
       )}
     </>
@@ -459,6 +490,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  modalBox: { width: '100%', borderRadius: 16, padding: 20 },
+  modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 16, textAlign: 'center' },
+  modalInput: {
+    borderWidth: 1, borderRadius: 10,
+    paddingHorizontal: 14, paddingVertical: 10,
+    marginBottom: 12, fontSize: 15,
+  },
+  modalButtonRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16, marginTop: 8 },
+  modalButton: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 10 },
   leftLine: {
     position: 'absolute',
     left: 0,

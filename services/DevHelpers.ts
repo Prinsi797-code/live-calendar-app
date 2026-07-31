@@ -11,23 +11,16 @@ class DevHelpers {
    */
   async resetToFirstTime(): Promise<void> {
     try {
-      console.log('🔄 Resetting app to first-time state...');
-      
-      // Reset onboarding
+      console.log('Resetting app to first-time state...');
       await OnboardingService.resetOnboarding();
-      
-      // Reset location
       await LocationService.resetLocationFetch();
-      
-      // Reset country
       await AsyncStorage.removeItem('selectedCountry');
       
-      // Reset first day of week
       await AsyncStorage.removeItem('firstDayOfWeek');
       
-      console.log('✅ App reset complete! Restart the app to see first-time flow.');
+      console.log('App reset complete! Restart the app to see first-time flow.');
     } catch (error) {
-      console.error('❌ Error resetting app:', error);
+      console.error('Error resetting app:', error);
     }
   }
 
@@ -36,12 +29,12 @@ class DevHelpers {
    */
   async completeOnboardingManually(): Promise<void> {
     try {
-      console.log('✅ Manually completing onboarding...');
+      console.log('Manually completing onboarding...');
       await OnboardingService.completeOnboarding();
       await OnboardingService.saveLanguage('en');
-      console.log('✅ Onboarding completed! Restart the app.');
+      console.log('Onboarding completed! Restart the app.');
     } catch (error) {
-      console.error('❌ Error completing onboarding:', error);
+      console.error('Error completing onboarding:', error);
     }
   }
 
@@ -50,11 +43,11 @@ class DevHelpers {
    */
   async checkAppState(): Promise<void> {
     try {
-      console.log('🔍 ===== Current App State =====');
+      console.log('===== Current App State =====');
       
       const onboardingCompleted = await OnboardingService.isOnboardingCompleted();
       console.log('Onboarding completed:', onboardingCompleted);
-      
+
       const language = await OnboardingService.getLanguage();
       console.log('Saved language:', language);
       
@@ -63,13 +56,13 @@ class DevHelpers {
       
       const country = await LocationService.getSelectedCountry();
       console.log('Selected country:', country);
-      
+
       const firstDay = await AsyncStorage.getItem('firstDayOfWeek');
       console.log('First day of week:', firstDay);
-      
-      console.log('🔍 ===========================');
+
+      console.log('===========================');
     } catch (error) {
-      console.error('❌ Error checking app state:', error);
+      console.error('Error checking app state:', error);
     }
   }
 
@@ -78,11 +71,11 @@ class DevHelpers {
    */
   async clearAllStorage(): Promise<void> {
     try {
-      console.log('💣 Clearing ALL AsyncStorage...');
+      console.log('Clearing ALL AsyncStorage...');
       await AsyncStorage.clear();
-      console.log('✅ All storage cleared! Restart the app.');
+      console.log('All storage cleared! Restart the app.');
     } catch (error) {
-      console.error('❌ Error clearing storage:', error);
+      console.error('Error clearing storage:', error);
     }
   }
 
@@ -91,12 +84,12 @@ class DevHelpers {
    */
   async setCountry(countryName: string): Promise<void> {
     try {
-      console.log('🌍 Setting country to:', countryName);
+      console.log('Setting country to:', countryName);
       await AsyncStorage.setItem('selectedCountry', countryName);
       await AsyncStorage.setItem('locationFetched', 'true');
-      console.log('✅ Country set!');
+      console.log('Country set!');
     } catch (error) {
-      console.error('❌ Error setting country:', error);
+      console.error('Error setting country:', error);
     }
   }
 }

@@ -154,13 +154,16 @@ export default function Country({ navigation }: any) {
     id: string;
   } | null>(null);
 
-  // Load banner config from setting_screen (country uses setting_screen config)
-  useEffect(() => {
-    const config = AdsManager.getBannerConfig('setting');
-    console.log('Country screen banner config:', config);
-    setBannerConfig(config);
-  }, []);
 
+  useEffect(() => {
+    const loadBannerConfig = async () => {
+      const config = await AdsManager.getBannerConfig('setting');
+      console.log('Country screen banner config:', config);
+      setBannerConfig(config);
+    };
+    loadBannerConfig();
+  }, []);
+  
   useFocusEffect(
     React.useCallback(() => {
       InteractionManager.runAfterInteractions(() => {

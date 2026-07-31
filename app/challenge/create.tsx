@@ -108,9 +108,18 @@ export default function CreateScreen() {
         checkPremium();
     }, []);
 
+    // useEffect(() => {
+    //     const config = AdsManager.getBannerConfig('home');
+    //     setBannerConfig(config);
+    // }, []);
+
     useEffect(() => {
-        const config = AdsManager.getBannerConfig('home');
-        setBannerConfig(config);
+        const loadBannerConfig = async () => {
+            const config = await AdsManager.getBannerConfig('main');
+            console.log('challenge create screen banner config:', config);
+            setBannerConfig(config);
+        };
+        loadBannerConfig();
     }, []);
 
     const handleCreateOption = (optionId: string) => {

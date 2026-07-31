@@ -106,9 +106,18 @@ export default function RelaxationScreen() {
         position: string;
     } | null>(null);
 
+    // useEffect(() => {
+    //     const config = AdsManager.getBannerConfig('home');
+    //     setBannerConfig(config);
+    // }, []);
+
     useEffect(() => {
-        const config = AdsManager.getBannerConfig('home');
-        setBannerConfig(config);
+        const loadBannerConfig = async () => {
+            const config = await AdsManager.getBannerConfig('main');
+            console.log('relax screen banner config:', config);
+            setBannerConfig(config);
+        };
+        loadBannerConfig();
     }, []);
 
     const handleChallengeSelect = (challenge: ChallengeOption) => {

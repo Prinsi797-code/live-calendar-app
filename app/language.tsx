@@ -68,18 +68,25 @@ export default function Language() {
     checkPremium();
   }, []);
 
+  // useEffect(() => {
+  //   const loadBannerConfig = async () => {
+  //     const completed = await OnboardingService.isOnboardingCompleted();
+  //     const configType = !completed ? 'language' : 'setting';
+  //     const config = AdsManager.getBannerConfig(configType);
+  //     console.log(`Language screen banner config (${configType}):`, config);
+  //     setBannerConfig(config);
+  //   };
+  //   loadBannerConfig();
+  // }, []);
+
   useEffect(() => {
     const loadBannerConfig = async () => {
       const completed = await OnboardingService.isOnboardingCompleted();
-      // First-time user → use language_screen config
-      // Returning user (from settings) → use setting_screen config
       const configType = !completed ? 'language' : 'setting';
-      const config = AdsManager.getBannerConfig(configType);
-
+      const config = await AdsManager.getBannerConfig(configType);
       console.log(`Language screen banner config (${configType}):`, config);
       setBannerConfig(config);
     };
-
     loadBannerConfig();
   }, []);
 
@@ -273,7 +280,7 @@ export default function Language() {
             {t("done")}
           </Text> */}
           <View style={[styles.closeBtnCircle, { backgroundColor: colors.cardBackground }]}>
-              <Feather name="check" size={26} style={[{ color: colors.primary}]} />
+            <Feather name="check" size={26} style={[{ color: colors.primary }]} />
           </View>
         </TouchableOpacity>
       </View>

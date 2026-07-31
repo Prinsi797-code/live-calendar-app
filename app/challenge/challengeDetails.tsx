@@ -51,9 +51,17 @@ export default function ChallengeDetailsScreen() {
     position: string;
   } | null>(null);
 
+  // useEffect(() => {
+  //   const config = AdsManager.getBannerConfig('event');
+  //   setBannerConfig(config);
+  // }, []);
   useEffect(() => {
-    const config = AdsManager.getBannerConfig('event');
-    setBannerConfig(config);
+    const loadBannerConfig = async () => {
+      const config = await AdsManager.getBannerConfig('event');
+      console.log('challenge screen banner config:', config);
+      setBannerConfig(config);
+    };
+    loadBannerConfig();
   }, []);
 
   useEffect(() => {

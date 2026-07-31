@@ -466,6 +466,52 @@ class NotificationService {
     console.log('✅ Both daily notifications scheduled!');
   }
 
+  async scheduleDailyQuoteNotification() {
+  try {
+    await this.cancelDailyQuoteNotification();
+
+    const notificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '✨ Daily Quote',
+        body: 'Your daily quote is ready — tap to see today\'s inspiration 🌟',
+        data: {
+          type: 'daily_quote',
+        },
+        sound: 'default',
+        ...(Platform.OS === 'ios' ? { badge: 1 } : {
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+          vibrate: [0, 250, 250, 250],
+        }),
+      },
+      trigger: {
+        type: 'daily',
+        hour: 9,
+        minute: 0,
+        ...(Platform.OS === 'android' ? { channelId: 'event-reminders' } : {}),
+      },
+    });
+
+    await AsyncStorage.setItem('daily_quote_notification_id', notificationId);
+    console.log('✅ Daily quote notification scheduled:', notificationId);
+    return notificationId;
+  } catch (error) {
+    console.error('Error scheduling daily quote notification:', error);
+    return null;
+  }
+}
+
+async cancelDailyQuoteNotification() {
+  try {
+    const id = await AsyncStorage.getItem('daily_quote_notification_id');
+    if (id) {
+      await this.cancelNotification(id);
+      await AsyncStorage.removeItem('daily_quote_notification_id');
+      console.log('🗑️ Daily quote notification cancelled');
+    }
+  } catch (error) {
+    console.error('Error cancelling daily quote notification:', error);
+  }
+}
 
   async scheduleDiaryNotification(
     diaryId: string,
@@ -864,7 +910,7 @@ class NotificationService {
 
       for (const notif of diaryNotifications) {
         await Notifications.dismissNotificationAsync(notif.request.identifier);
-        console.log('✅ Dismissed diary notification from lock screen');
+        console.log('Dismissed diary notification from lock screen');
       }
     } catch (error) {
       console.error('Error cancelling diary notification:', error);
@@ -878,7 +924,7 @@ class NotificationService {
       if (notifId) {
         await this.cancelNotification(notifId);
         await AsyncStorage.removeItem(`memo_${memoId}_notification`);
-        console.log('✅ Memo notification cancelled:', notifId);
+        console.log('Memo notification cancelled:', notifId);
       }
 
       const delivered = await Notifications.getPresentedNotificationsAsync();
@@ -888,7 +934,7 @@ class NotificationService {
 
       for (const notif of memoNotifications) {
         await Notifications.dismissNotificationAsync(notif.request.identifier);
-        console.log('✅ Dismissed memo notification from lock screen');
+        console.log('Dismissed memo notification from lock screen');
       }
     } catch (error) {
       console.error('Error cancelling memo notification:', error);
@@ -901,7 +947,7 @@ class NotificationService {
       if (notifId) {
         await this.cancelNotification(notifId);
         await AsyncStorage.removeItem(`challenge_${challengeId}_notification`);
-        console.log('✅ Challenge notification cancelled:', notifId);
+        console.log('Challenge notification cancelled:', notifId);
       }
 
       const delivered = await Notifications.getPresentedNotificationsAsync();
@@ -911,7 +957,7 @@ class NotificationService {
 
       for (const notif of challengeNotifications) {
         await Notifications.dismissNotificationAsync(notif.request.identifier);
-        console.log('✅ Dismissed challenge notification from lock screen');
+        console.log('Dismissed challenge notification from lock screen');
       }
     } catch (error) {
       console.error('Error cancelling challenge notification:', error);
@@ -924,7 +970,7 @@ class NotificationService {
       if (notifId) {
         await this.cancelNotification(notifId);
         await AsyncStorage.removeItem(`event_${eventId}_notification`);
-        console.log('✅ Event notification cancelled:', notifId);
+        console.log('Event notification cancelled:', notifId);
       }
 
       const notificationIds = await AsyncStorage.getItem(`event_${eventId}_notifications`);
@@ -932,7 +978,7 @@ class NotificationService {
         const ids = JSON.parse(notificationIds);
         for (const id of ids) {
           await this.cancelNotification(id);
-          console.log('✅ Event notification cancelled:', id);
+          console.log('Event notification cancelled:', id);
         }
         await AsyncStorage.removeItem(`event_${eventId}_notifications`);
       }
@@ -944,7 +990,7 @@ class NotificationService {
 
       for (const notif of eventNotifications) {
         await Notifications.dismissNotificationAsync(notif.request.identifier);
-        console.log('✅ Dismissed event notification from lock screen');
+        console.log('Dismissed event notification from lock screen');
       }
     } catch (error) {
       console.error('Error cancelling event notification:', error);

@@ -2,6 +2,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DrawerActions } from '@react-navigation/native';
 import * as Sentry from '@sentry/react-native';
+import { Image as ExpoImage } from 'expo-image';
 import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
 import { useNavigation, usePathname, useRouter } from 'expo-router';
@@ -20,8 +21,9 @@ import LocationService from '../services/LocationService';
 import NotificationService from '../services/NotificationService';
 import OnboardingService from '../services/OnboardingService';
 import PurchaseManager from '../services/purchaseManager';
-import { initAnalytics, trackAppOpen, trackEvent, trackScreen } from '../utils/analytics';
+import { initAnalytics, setUserCountry, trackAppOpen, trackEvent, trackScreen } from '../utils/analytics';
 import { initializeI18n } from '../utils/i18n';
+import { MOOD_OPTIONS } from '../utils/moodStorage';
 import {
   checkAndRefreshStreak, getStreak, scheduleOnboardingNotificationIfNeeded,
   scheduleStreakWarningIfNeeded
@@ -79,6 +81,7 @@ function SplashScreen({ onComplete, skipAd = false }: { onComplete: () => void; 
       const updateNotification = await NotificationService.checkAppStoreUpdate();
       if (hasPermission) {
         await NotificationService.scheduleDailyNotifications();
+        await NotificationService.scheduleDailyQuoteNotification();
       }
     };
     setupNotifications();
@@ -228,7 +231,6 @@ function DrawerNavigator() {
   const posthog = usePostHog();
   const [splashFinished, setSplashFinished] = useState(false);
   const pathname = usePathname();
-
   const initStartedRef = useRef(false);
 
   useEffect(() => {
@@ -283,7 +285,11 @@ function DrawerNavigator() {
             }
           }
           break;
-
+        case 'daily_quote':
+          return {
+            pathname: '/daily-quote',
+            params: {}
+          };
         case 'memo':
           const memosData = await AsyncStorage.getItem('memo');
           if (memosData) {
@@ -417,11 +423,20 @@ function DrawerNavigator() {
     }
     initStartedRef.current = true;
 
-
     const initializeApp = async () => {
       try {
+        ExpoImage.prefetch(MOOD_OPTIONS.map((m) => m.image), { cachePolicy: 'memory-disk' })
+          .catch((e) => console.log('Mood asset preload error:', e));
+
         await initAnalytics();
         await trackAppOpen();
+
+        const hasNotifPermission = await NotificationService.requestPermissions();
+        await NotificationService.checkAppStoreUpdate();
+        if (hasNotifPermission) {
+          await NotificationService.scheduleDailyNotifications();
+          await NotificationService.scheduleDailyQuoteNotification();
+        }
 
         await PurchaseManager.initialize();
         const premiumStatus = await PurchaseManager.checkAndRestorePremium();
@@ -435,9 +450,7 @@ function DrawerNavigator() {
         });
 
         if (isFromNotification) {
-
           await AsyncStorage.setItem('opened_from_notification', 'true');
-
           const notificationData = lastNotification.notification.request.content.data;
           if (!premiumStatus) {
             await AdsManager.initializeAdsWithoutFloorInter();
@@ -445,6 +458,7 @@ function DrawerNavigator() {
           await initializeI18n();
 
           const routeData = await getNotificationRouteData(notificationData);
+          
           if (routeData) {
             setInitialRoute(routeData);
             setOpenedFromNotification(true);
@@ -456,7 +470,6 @@ function DrawerNavigator() {
         }
 
         await AsyncStorage.removeItem('opened_from_notification');
-
 
         if (!premiumStatus) {
           console.log('Normal launch - loading ads');
@@ -476,6 +489,9 @@ function DrawerNavigator() {
           try {
             const country = await LocationService.fetchAndSaveUserCountry();
             console.log('Country detected:', country || 'Using default');
+            if (country) {
+              await setUserCountry(country);
+            }
           } catch (error) {
             console.error('Country detection failed:', error);
           }
@@ -488,6 +504,10 @@ function DrawerNavigator() {
         try {
           const country = await LocationService.fetchAndSaveUserCountry();
           console.log('Country detected:', country || 'Using default');
+          if (country) {
+            await setUserCountry(country);
+          }
+
         } catch (error) {
           console.error('Country detection failed:', error);
         }
@@ -1029,7 +1049,7 @@ function DrawerContent({ navigation }: any) {
 
   return (
     <>
-      <ScrollView style={[styles.drawerContent, { backgroundColor: colors.background }]}>
+      <View style={[styles.drawerContent, { backgroundColor: colors.background }]}>
         <View style={styles.drawerHeader}>
           <View style={styles.dateRow}>
             <View style={styles.dateBox}>
@@ -1081,7 +1101,7 @@ function DrawerContent({ navigation }: any) {
           <Image source={require('../assets/icons/Icon1.png')} style={styles.menuIconImage} resizeMode="contain" />
           <Text style={[styles.menuTitle, { color: colors.textPrimary }]}>{t("settings")}</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
       <Image source={require("../assets/images/bottom-flower.png")} style={styles.bottomFixedImage} />
       <FirstDaySelector
         visible={showFirstDaySelector}

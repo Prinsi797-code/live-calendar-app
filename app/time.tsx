@@ -36,11 +36,20 @@ export default function TimeFormatSettings() {
     position: string;
   } | null>(null);
 
+  // useEffect(() => {
+  //   const config = AdsManager.getBannerConfig('setting');
+  //   console.log('Time format screen banner config:', config);
+  //   setBannerConfig(config);
+  // }, []);
+
   useEffect(() => {
-    const config = AdsManager.getBannerConfig('setting');
-    console.log('Time format screen banner config:', config);
-    setBannerConfig(config);
-  }, []);
+      const loadBannerConfig = async () => {
+        const config = await AdsManager.getBannerConfig('setting');
+        console.log('time screen banner config:', config);
+        setBannerConfig(config);
+      };
+      loadBannerConfig();
+    }, []);
 
   useEffect(() => {
     detectTimeFormat();

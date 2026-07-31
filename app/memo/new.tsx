@@ -157,9 +157,18 @@ export default function NewMemoScreen() {
     }, [])
   );
 
+  // useEffect(() => {
+  //   const config = AdsManager.getBannerConfig('home');
+  //   setBannerConfig(config);
+  // }, []);
+
   useEffect(() => {
-    const config = AdsManager.getBannerConfig('home');
-    setBannerConfig(config);
+    const loadBannerConfig = async () => {
+      const config = await AdsManager.getBannerConfig('main');
+      console.log('memo screen banner config:', config);
+      setBannerConfig(config);
+    };
+    loadBannerConfig();
   }, []);
 
   useEffect(() => {
@@ -298,7 +307,7 @@ export default function NewMemoScreen() {
         console.log('Attempting to show memo save ad...');
 
         setTimeout(async () => {
-            await AdsManager.showEventScreenInterstitialAd('CreateMemo', 'save');
+          await AdsManager.showEventScreenInterstitialAd('CreateMemo', 'save');
         }, 100);
 
         // const adShown = await AdsManager.showEventScreenInterstitialAd('CreateMemo', 'save');
@@ -490,11 +499,11 @@ export default function NewMemoScreen() {
         return;
       } else {
         router.replace("memo");
-      
+
         setTimeout(async () => {
-            await AdsManager.showEventScreenInterstitialAd('CreateMemo', 'back');
+          await AdsManager.showEventScreenInterstitialAd('CreateMemo', 'back');
         }, 100);
-        
+
       }
     } catch (error) {
       console.error("Cancel error:", error);

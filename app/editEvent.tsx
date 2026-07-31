@@ -119,9 +119,18 @@ export default function EditEventScreen() {
         position: string;
     } | null>(null);
 
+    // useEffect(() => {
+    //     const config = AdsManager.getBannerConfig('main');
+    //     setBannerConfig(config);
+    // }, []);
+
     useEffect(() => {
-        const config = AdsManager.getBannerConfig('home');
-        setBannerConfig(config);
+        const loadBannerConfig = async () => {
+            const config = await AdsManager.getBannerConfig('main');
+            console.log('edit event screen banner config:', config);
+            setBannerConfig(config);
+        };
+        loadBannerConfig();
     }, []);
 
     useEffect(() => {

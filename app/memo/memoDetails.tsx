@@ -58,9 +58,18 @@ export default function MemoDetailsScreen() {
         checkPremium();
     }, []);
 
+    // useEffect(() => {
+    //     const config = AdsManager.getBannerConfig('event');
+    //     setBannerConfig(config);
+    // }, []);
+
     useEffect(() => {
-        const config = AdsManager.getBannerConfig('event');
-        setBannerConfig(config);
+        const loadBannerConfig = async () => {
+            const config = await AdsManager.getBannerConfig('event');
+            console.log('memo screen banner config:', config);
+            setBannerConfig(config);
+        };
+        loadBannerConfig();
     }, []);
 
     const [memo, setMemo] = useState<Memo | null>(null);

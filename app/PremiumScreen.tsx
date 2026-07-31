@@ -73,7 +73,6 @@ const PLANS: Plan[] = [
 export default function PremiumScreen() {
     const { theme, colors } = useTheme();
 
-    // const isDarkMode = theme === 'dark';
     const isDarkMode = theme === 'dark' || (theme === 'system' && Appearance.getColorScheme() === 'dark');
     const [selectedPlan, setSelectedPlan] = useState<PlanKey>('yearly');
     const [products, setProducts] = useState<Record<string, Subscription>>({});
@@ -134,7 +133,7 @@ export default function PremiumScreen() {
                     setPurchasing(false);
                     const key = getPlanKeyFromProductId(productId);
                     if (key) setActivePlanKey(key);
-                    setShowSuccessModal(true); // ← sirf yeh change karo
+                    setShowSuccessModal(true);
                 },
                 (error) => {
                     setPurchasing(false);
@@ -186,7 +185,6 @@ export default function PremiumScreen() {
         } catch {
             setPurchasing(false);
         } finally {
-            // 30 sec baad bhi stuck ho toh automatically reset
             setTimeout(() => setPurchasing(false), 30000);
         }
 

@@ -20,6 +20,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import AdsManager from '../../services/adsManager';
 import OnboardingService from '../../services/OnboardingService';
 import PurchaseManager from '../../services/purchaseManager';
+import { trackScreen } from '../../utils/analytics';
 import { initializeI18n } from '../../utils/i18n';
 
 const TAB_ICONS: Record<string, keyof typeof Feather.glyphMap> = {
@@ -138,7 +139,10 @@ function GlassTabBar({ state, navigation, descriptors, bottomOffset = 0 }: any) 
                 icon={icon}
                 label={label}
                 isActive={isActive}
-                onPress={() => navigation.navigate(route.name)}
+                onPress={() => {
+                  navigation.navigate(route.name);
+                  trackScreen(route.name);
+                }}
               />
             );
           })}
@@ -187,6 +191,7 @@ export default function TabLayout() {
     init();
   }, []);
 
+
   useEffect(() => {
     if (!isI18nReady) return;
     const onLangChange = (lng: string) => console.log('🌍 Language:', lng);
@@ -201,14 +206,33 @@ export default function TabLayout() {
     if (premiumStatus) setBannerConfig(null);
   };
 
+  // useEffect(() => {
+  //   const initAds = async () => {
+  //     await checkPremiumStatus();
+  //     const premiumStatus = await PurchaseManager.isPremium();
+
+  //     if (premiumStatus) { setIsAdsReady(true); return; }
+  //     if (!AdsManager.isConfigReady()) await AdsManager.initializeAds();
+  //     setBannerConfig(AdsManager.getBannerConfig("main"));
+  //     setIsAdsReady(true);
+  //   };
+  //   initAds();
+  // }, []);
+
   useEffect(() => {
     const initAds = async () => {
       await checkPremiumStatus();
       const premiumStatus = await PurchaseManager.isPremium();
 
-      if (premiumStatus) { setIsAdsReady(true); return; }
+      if (premiumStatus) {
+        setIsAdsReady(true);
+        return;
+      }
+
       if (!AdsManager.isConfigReady()) await AdsManager.initializeAds();
-      setBannerConfig(AdsManager.getBannerConfig("main"));
+
+      const config = await AdsManager.getBannerConfig("main");
+      setBannerConfig(config);
       setIsAdsReady(true);
     };
     initAds();
@@ -236,10 +260,16 @@ export default function TabLayout() {
 
   const showBanner = !isPremium && bannerConfig?.show;
 
+  // useEffect(() => {
+  //   if (showBanner) {
+  //     trackEvent('banner_ad_shown', { screen_name: 'main_tabs' });
+  //   }
+  // }, [showBanner]);
+
   return (
     <View style={{ flex: 1, }}>
       <Tabs
-        screenOptions={{ headerShown: false,tabBarStyle: { display: 'none' } }}
+        screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}
         tabBar={(props) => (
           <GlassTabBar {...props} bottomOffset={showBanner ? BANNER_HEIGHT : 0} />
         )}
@@ -270,8 +300,8 @@ const styles = StyleSheet.create({
     right: 0,
   },
   glassContainer: {
-    height: 60,
-    borderRadius: 50,
+    height: 65,
+    borderRadius: 80,
     overflow: 'hidden',
     shadowOffset: { width: 10, height: 12 },
     shadowOpacity: 0.35,

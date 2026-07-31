@@ -38,10 +38,20 @@ export default function YearView() {
 
     const formatDate = (d) => (d < 10 ? `0${d}` : d);
 
+    // useEffect(() => {
+    //     const config = AdsManager.getBannerConfig('setting');
+    //     setBannerConfig(config);
+    // }, []);
+
     useEffect(() => {
-        const config = AdsManager.getBannerConfig('setting');
-        setBannerConfig(config);
-    }, []);
+        const loadBannerConfig = async () => {
+          const config = await AdsManager.getBannerConfig('setting');
+          console.log('yearview screen banner config:', config);
+          setBannerConfig(config);
+        };
+        loadBannerConfig();
+      }, []);
+    
 
     const getMonths = (lang) => {
         const localeMap = {

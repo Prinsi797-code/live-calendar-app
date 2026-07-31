@@ -110,10 +110,19 @@ export default function ViewEventScreen() {
         return repeatMap[repeat] || repeat;
     };
 
+    // useEffect(() => {
+    //     const config = AdsManager.getBannerConfig('event');
+    //     setBannerConfig(config);
+    // }, []);
+
     useEffect(() => {
-        const config = AdsManager.getBannerConfig('event');
-        setBannerConfig(config);
-    }, []);
+        const loadBannerConfig = async () => {
+          const config = await AdsManager.getBannerConfig('event');
+          console.log('ViewEvent screen banner config:', config);
+          setBannerConfig(config);
+        };
+        loadBannerConfig();
+      }, []);
 
     const handleEdit = () => {
         router.push({

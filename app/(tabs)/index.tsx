@@ -12,8 +12,8 @@ import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { COUNTRY_CALENDAR_IDS } from '../../constants/countryCalendars';
 
 import { useTheme } from '../../contexts/ThemeContext';
+import { getMoodEntry } from '../../utils/moodStorage';
 import { loadData, saveData } from '../../utils/storage';
-
 
 declare global {
   var firstDayChanged: ((day: number) => void) | undefined;
@@ -62,12 +62,24 @@ export default function CalendarScreen({ navigation }: any) {
   const { t, i18n } = useTranslation();
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [is24Hour, setIs24Hour] = useState(false);
-
+  const MOOD_FAB_VISIBLE_KEY = 'moodFabVisible';
+  const [moodFabVisible, setMoodFabVisible] = useState(true);
   const lightNoEventImg = require("../../assets/images/no-events.png");
   const darkNoEventImg = require("../../assets/images/dark-no-event.png");
 
   const params = useLocalSearchParams();
   const [calendarKey, setCalendarKey] = useState(0);
+  const [todayMoodLogged, setTodayMoodLogged] = useState(false);
+
+  const checkTodayMood = async () => {
+    try {
+      const today = getLocalDateString();
+      const entry = await getMoodEntry(today);
+      setTodayMoodLogged(!!entry?.mood);
+    } catch (e) {
+      console.log('checkTodayMood error', e);
+    }
+  };
 
   useEffect(() => {
     const requestNotificationPermission = async () => {
@@ -186,9 +198,18 @@ export default function CalendarScreen({ navigation }: any) {
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const API_KEY = "AIzaSyCbk3aJTWGqJZVHtb3SR7OqzUFEc9Cewe0";
 
+  // useEffect(() => {
+  //   const config = AdsManager.getBannerConfig('home');
+  //   setBannerConfig(config);
+  // }, []);
+
   useEffect(() => {
-    const config = AdsManager.getBannerConfig('home');
-    setBannerConfig(config);
+    const loadBannerConfig = async () => {
+      const config = await AdsManager.getBannerConfig('main');
+      console.log('index screen banner config:', config);
+      setBannerConfig(config);
+    };
+    loadBannerConfig();
   }, []);
 
   useEffect(() => {
@@ -490,10 +511,19 @@ export default function CalendarScreen({ navigation }: any) {
         if (data) setEvents(data);
       };
 
+      const loadMoodFabVisibility = async () => {
+        try {
+          const val = await AsyncStorage.getItem(MOOD_FAB_VISIBLE_KEY);
+          setMoodFabVisible(val !== 'false');
+        } catch (e) { }
+      };
+
       reloadData();
       loadFirstDay();
       loadTimeFormat();
       loadSelectedCountries();
+      loadMoodFabVisibility();
+      checkTodayMood();
 
       console.log('🔄 useFocusEffect - Preserving view - Selected date:', selectedDate, 'Show month events:', showMonthEvents);
     }, [])
@@ -1102,8 +1132,30 @@ export default function CalendarScreen({ navigation }: any) {
           )}
         </View>
       </ScrollView>
-      {/* FAB BUTTON */}
-      <View style={{ position: "absolute", right: 30, bottom: 170 }}>
+      {/* Mood sticky button - bottom left */}
+      {moodFabVisible && !todayMoodLogged && (
+        <View style={{ position: "absolute", left: 20, bottom: 170 }}>
+          <TouchableOpacity
+            style={[styles.moodFab]}
+            onPress={() => {
+              router.push({
+                pathname: '/moodPicker',
+                params: { date: getLocalDateString() }
+              });
+            }}
+            activeOpacity={0.8}
+          >
+            <Image
+              source={require("../../assets/icons/emoji.png")}
+              style={{ width: 60, height: 60 }}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Add-event FAB - bottom right (unchanged) */}
+      <View style={{ position: "absolute", right: 20, bottom: 170 }}>
         <Animated.View
           style={[
             styles.pulseRing,
@@ -1236,6 +1288,18 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  moodFab: {
+    width: 45,
+    height: 45,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
     shadowRadius: 4,
   },
   fabText: {

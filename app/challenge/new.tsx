@@ -225,9 +225,18 @@ export default function NewChallengeScreen() {
         }, [isEditMode, from, params.title, params.icon])
     );
 
+    // useEffect(() => {
+    //     const config = AdsManager.getBannerConfig('home');
+    //     setBannerConfig(config);
+    // }, []);
+
     useEffect(() => {
-        const config = AdsManager.getBannerConfig('home');
-        setBannerConfig(config);
+        const loadBannerConfig = async () => {
+            const config = await AdsManager.getBannerConfig('main');
+            console.log('new challenge screen banner config:', config);
+            setBannerConfig(config);
+        };
+        loadBannerConfig();
     }, []);
 
     const repeatOptions = [
@@ -694,7 +703,7 @@ export default function NewChallengeScreen() {
                                 gap: 10,
                             }}
                         >
-                            <Text style={{ fontSize: 26, marginTop:5 }}>🎉</Text>
+                            <Text style={{ fontSize: 26, marginTop: 5 }}>🎉</Text>
                             <View style={{ flex: 1, justifyContent: 'center', }}>
                                 <Text style={{
                                     color: '#fff',

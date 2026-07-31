@@ -122,9 +122,17 @@ export default function NewDiaryScreen() {
         position: string;
     } | null>(null);
 
+    // useEffect(() => {
+    //     const config = AdsManager.getBannerConfig('home');
+    //     setBannerConfig(config);
+    // }, []);
     useEffect(() => {
-        const config = AdsManager.getBannerConfig('home');
-        setBannerConfig(config);
+        const loadBannerConfig = async () => {
+            const config = await AdsManager.getBannerConfig('main');
+            console.log('diary new screen banner config:', config);
+            setBannerConfig(config);
+        };
+        loadBannerConfig();
     }, []);
 
     useEffect(() => {
@@ -278,8 +286,8 @@ export default function NewDiaryScreen() {
                 console.log('👑 Premium user — skipping ad');
                 router.back();
             } else {
-               const adShown = await AdsManager.showEventScreenInterstitialAd('CreateDiary', 'save');
-               if (adShown) {
+                const adShown = await AdsManager.showEventScreenInterstitialAd('CreateDiary', 'save');
+                if (adShown) {
                     console.log('Ad successfully triggered. Giving delay for safe navigation...');
                     setTimeout(() => {
                         router.back();
@@ -381,12 +389,12 @@ export default function NewDiaryScreen() {
                 console.log('👑 Premium user — skipping ad');
                 router.replace("diary");
             } else {
-                
+
                 router.replace("diary");
 
-            setTimeout(async () => {
-                await AdsManager.showEventScreenInterstitialAd('CreateDiary', 'back');
-            }, 100);
+                setTimeout(async () => {
+                    await AdsManager.showEventScreenInterstitialAd('CreateDiary', 'back');
+                }, 100);
 
                 // console.log('🎬 Diary cancel pressed, attempting to show ad...');
                 // const adShown = await AdsManager.showEventScreenInterstitialAd('CreateDiary', 'back');

@@ -393,9 +393,15 @@ export default function WeekScreen() {
             await checkPremiumStatus();
             const premiumStatus = await PurchaseManager.isPremium();
 
-            if (premiumStatus) { setIsAdsReady(true); return; }
+            if (premiumStatus) {
+                setIsAdsReady(true);
+                return;
+            }
+
             if (!AdsManager.isConfigReady()) await AdsManager.initializeAds();
-            setBannerConfig(AdsManager.getBannerConfig("main"));
+
+            const config = await AdsManager.getBannerConfig("main");
+            setBannerConfig(config);
             setIsAdsReady(true);
         };
         initAds();
@@ -571,7 +577,7 @@ export default function WeekScreen() {
                 {selectedEvents.length === 0 ? (
                     <View style={{ alignItems: "center", paddingVertical: 40 }}>
                         <Image
-                            source={resolvedTheme === "dark" ? darkNoEventImg : lightNoEventImg} 
+                            source={resolvedTheme === "dark" ? darkNoEventImg : lightNoEventImg}
                             style={{ width: 200, height: 200, marginBottom: 0 }}
                             resizeMode="contain"
                         />
@@ -695,7 +701,7 @@ const styles = StyleSheet.create({
     dateCellNumber: { fontSize: 15 },
     eventDot: { width: 5, height: 5, borderRadius: 2.5 },
     divider: { height: 1 },
-    eventsList: { flex: 1, paddingHorizontal: 16},
+    eventsList: { flex: 1, paddingHorizontal: 16 },
     selectedDayLabel: { fontSize: 13, fontWeight: '700', marginTop: 16, marginBottom: 10, letterSpacing: 0.3 },
     otherDayLabel: { fontSize: 13, fontWeight: '600', marginTop: 22, marginBottom: 10, letterSpacing: 0.3 },
     eventCard: {

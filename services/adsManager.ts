@@ -7,6 +7,7 @@ import {
 } from 'react-native-google-mobile-ads';
 import { trackAdShown } from '../utils/analytics';
 import { fetchAppConfig } from '../utils/firebaseConfig';
+import PurchaseManager from './purchaseManager';
 
 interface AdConfig {
   detail_screen?: {
@@ -83,6 +84,15 @@ class AdsManager {
   private rewardedAd: any | null = null;
   private isRewardedAdLoaded = false;
 
+  private async isUserPremium(): Promise<boolean> {
+  try {
+    return await PurchaseManager.isPremium();
+  } catch (e) {
+    console.log('Premium check failed, defaulting to false:', e);
+    return false;
+  }
+}
+
   // Ad frequency tracking keys
   private readonly SPLASH_AD_SHOWN_KEY = 'splash_ad_shown';
   private readonly SPLASH_AD_LAST_SHOWN_KEY = 'splash_ad_last_shown';
@@ -102,7 +112,7 @@ class AdsManager {
 
   static setSkipNextAppOpenAd(skip: boolean) {
     this.skipNextAppOpenAd = skip;
-    console.log('🔔 Skip next App Open Ad:', skip);
+    console.log('Skip next App Open Ad:', skip);
   }
 
   static getInstance(): AdsManager {
@@ -113,8 +123,9 @@ class AdsManager {
   }
 
   async loadRewardedAd() {
+
     const rewardConfig = this.config?.custom_theme;
-    console.log('🎯 Reward config:', JSON.stringify(rewardConfig));
+    console.log('Reward config:', JSON.stringify(rewardConfig));
 
     if (!rewardConfig || rewardConfig.reward_ad_flag !== 1 || !rewardConfig.reward_id?.trim()) {
       console.log('Rewarded ad not configured');
@@ -123,7 +134,7 @@ class AdsManager {
     try {
       const { RewardedAd, RewardedAdEventType } = await import('react-native-google-mobile-ads');
       const adUnitId = this.getAdUnitId(rewardConfig.reward_id);
-      console.log('🎯 Loading rewarded ad with ID:', adUnitId);
+      console.log('Loading rewarded ad with ID:', adUnitId);
 
       this.rewardedAd = RewardedAd.createForAdRequest(adUnitId, {
         requestNonPersonalizedAdsOnly: true,
@@ -131,22 +142,27 @@ class AdsManager {
 
       this.rewardedAd.addAdEventListener('rewarded_loaded', () => {
         this.isRewardedAdLoaded = true;
-        console.log('✅ Rewarded Ad Loaded successfully');
+        console.log('Rewarded Ad Loaded successfully');
       });
 
       this.rewardedAd.addAdEventListener('rewarded_error', (error: any) => {
-        console.log('❌ Rewarded Ad Error:', JSON.stringify(error));
+        console.log('Rewarded Ad Error:', JSON.stringify(error));
         this.isRewardedAdLoaded = false;
       });
-      console.log('🎯 Calling rewardedAd.load()...'); 
+      console.log('Calling rewardedAd.load()...'); 
       this.rewardedAd.load();
-      console.log('🎯 rewardedAd.load() called');
+      console.log('rewardedAd.load() called');
     } catch (error) {
-      console.log('❌ Rewarded Ad Load Failed:', error);
+      console.log('Rewarded Ad Load Failed:', error);
     }
   }
 
   async showCustomThemeRewardedAd(): Promise<boolean> {
+
+    if (await this.isUserPremium()) {
+  console.log('User is Premium — skipping ad');
+  return false;
+}
     const rewardConfig = this.config?.custom_theme;
 
     // Flag 0 = ads disabled, seedha apply karo
@@ -199,7 +215,7 @@ class AdsManager {
       });
     } catch (e) {
       console.log('Rewarded ad show failed:', e);
-      return true; // Fail hone par bhi theme apply karo
+      return true;
     }
   }
 
@@ -263,7 +279,6 @@ class AdsManager {
     return false;
   }
 
-  // Notification se open hone par call karo - saare ads skip karne ke liye
   static setOpenedFromNotification(value: boolean) {
     this.skipNextMainScreenAd = value;
     console.log('🔔 Opened from notification:', value);
@@ -273,8 +288,11 @@ class AdsManager {
     return this.skipNextMainScreenAd;
   }
 
-  // Background se foreground aane par call karo
   async loadMainScreenInterstitialAd() {
+    if (await this.isUserPremium()) {
+  console.log('User is Premium — skipping ad');
+  return false;
+}
     const mainConfig = this.config?.main_screen_ad;
 
     if (!mainConfig || !mainConfig.inter_id || mainConfig.inter_id.trim() === '') {
@@ -326,11 +344,14 @@ class AdsManager {
 
   async showMainScreenAd(): Promise<boolean> {
     console.log('Attempting Main Screen Ad (app foregrounded)');
-
+    if (await this.isUserPremium()) {
+    console.log('User is Premium — skipping main screen ad');
+    return false;
+  }
     // Notification se open hua? Skip karo
     if (AdsManager.skipNextMainScreenAd) {
       console.log('⏭️ Skipping main screen ad (opened from notification)');
-      AdsManager.skipNextMainScreenAd = false; // Reset after one skip
+      AdsManager.skipNextMainScreenAd = false;
       return false;
     }
 
@@ -421,7 +442,6 @@ class AdsManager {
 
   // ==================== SETTING SCREEN INTERSTITIAL AD ====================
   async loadSettingInterstitialAd() {
-    // Only load if floor interstitial is not available
     if (this.isFloorInterstitialLoaded && this.floorInterstitialAd) {
       console.log('Floor interstitial available, skipping setting interstitial load');
       return;
@@ -471,7 +491,6 @@ class AdsManager {
 
   // ==================== DETAIL SCREEN INTERSTITIAL AD ====================
   async loadDetailInterstitialAd() {
-    // Only load if floor interstitial is not available
     if (this.isFloorInterstitialLoaded && this.floorInterstitialAd) {
       console.log('Floor interstitial available, skipping detail interstitial load');
       return;
@@ -614,28 +633,23 @@ class AdsManager {
       }
     }
 
-    // Priority: floor_inter > splash inter
     let adToShow: InterstitialAd | null = null;
     let adType = '';
 
-    // PRIORITY 1: Check floor_inter first
     if (this.isFloorInterstitialLoaded && this.floorInterstitialAd) {
       adToShow = this.floorInterstitialAd;
       adType = 'floor';
       console.log('Using floor_inter for splash ad');
     }
-    // PRIORITY 2: Load splash-specific ad only if floor_inter is not available
     else if (splashConfig.inter_id && splashConfig.inter_id.trim() !== '') {
       console.log('Floor_inter not available, loading splash-specific ad');
       const adUnitId = this.getAdUnitId(splashConfig.inter_id);
 
       try {
-        // Create and load splash ad
         const splashAd = InterstitialAd.createForAdRequest(adUnitId, {
           requestNonPersonalizedAdsOnly: true,
         });
 
-        // Wait for ad to load
         await new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => {
             reject(new Error('Ad load timeout'));
@@ -674,7 +688,6 @@ class AdsManager {
     try {
       this.isShowingAd = true;
 
-      // Set up promise to wait for ad close
       const adClosedPromise = new Promise<void>((resolve) => {
         const closedListener = adToShow!.addAdEventListener(
           AdEventType.CLOSED,
@@ -686,7 +699,6 @@ class AdsManager {
           }
         );
 
-        // Fallback timeout (30 seconds)
         setTimeout(() => {
           console.log('Splash ad timeout');
           this.isShowingAd = false;
@@ -695,11 +707,9 @@ class AdsManager {
         }, 30000);
       });
 
-      // Show the ad
       await adToShow.show();
-      trackAdShown(adType, 'splash_screen'); // ← add karo
+      trackAdShown(adType, 'splash_screen');
 
-      // Save based on frequency
       if (frequency === 1) {
         await AsyncStorage.setItem(this.SPLASH_AD_SHOWN_KEY, 'true');
       }
@@ -709,7 +719,6 @@ class AdsManager {
 
       console.log(`Splash ad shown (${adType}), waiting for close...`);
 
-      // Wait for ad to be closed
       await adClosedPromise;
 
       console.log('Splash ad flow complete');
@@ -728,7 +737,6 @@ class AdsManager {
   private readonly LANGUAGE_AD_LAST_SHOWN_KEY = 'language_ad_last_shown';
 
   async loadLanguageInterstitialAd() {
-    // Only load if floor interstitial is not available
     if (this.isFloorInterstitialLoaded && this.floorInterstitialAd) {
       console.log('Floor interstitial available, skipping language interstitial load');
       return;
@@ -779,6 +787,11 @@ class AdsManager {
   async showLanguageScreenInterstitialAd(actionType: 'save' | 'back'): Promise<boolean> {
     console.log(`Attempting Language Screen ${actionType} Ad (First-time user)`);
 
+    if (await this.isUserPremium()) {
+    console.log('User is Premium — skipping language screen ad');
+    return false;
+  }
+
     if (this.isShowingAd) {
       console.log('Already showing an ad');
       return false;
@@ -827,7 +840,6 @@ class AdsManager {
 
     // 3 = every time (no check needed)
 
-    // Priority: floor_inter > language_inter
     let adToShow: InterstitialAd | null = null;
     let adType = '';
 
@@ -848,13 +860,11 @@ class AdsManager {
       this.isShowingAd = true;
       await adToShow.show();
 
-      // Update cooldown
       this.recentAdShown = {
         screenName: 'language_screen',
         timestamp: Date.now()
       };
 
-      // Save based on frequency
       if (frequency === 1) {
         await AsyncStorage.setItem(this.LANGUAGE_AD_SHOWN_KEY, 'true');
       }
@@ -875,6 +885,10 @@ class AdsManager {
   async showSettingScreenInterstitialAd(actionType: 'save' | 'back'): Promise<boolean> {
     console.log(`Attempting Setting Screen ${actionType} Ad`);
 
+    if (await this.isUserPremium()) {
+    console.log('User is Premium — skipping setting screen ad');
+    return false;
+  }
     if (this.isShowingAd) {
       console.log('Already showing an ad');
       return false;
@@ -923,7 +937,6 @@ class AdsManager {
 
     // 3 = every time (no check needed)
 
-    // Priority: floor_inter > setting_inter
     let adToShow: InterstitialAd | null = null;
     let adType = '';
 
@@ -945,13 +958,11 @@ class AdsManager {
       await adToShow.show();
       trackAdShown(adType, 'setting_screen');
 
-      // Update cooldown
       this.recentAdShown = {
         screenName: 'setting_screen',
         timestamp: Date.now()
       };
 
-      // Save based on frequency
       if (frequency === 1) {
         await AsyncStorage.setItem(this.SETTING_AD_SHOWN_KEY, 'true');
       }
@@ -968,9 +979,13 @@ class AdsManager {
     }
   }
 
-  // ==================== DETAIL SCREEN ADS (Event, Challenge, Memo, Diary back button) ====================
   async showDetailScreenInterstitialAd(screenName: string): Promise<boolean> {
     console.log(`Attempting Detail Screen Ad for: ${screenName}`);
+
+    if (await this.isUserPremium()) {
+    console.log('User is Premium — skipping detail screen ad');
+    return false;
+  }
 
     if (this.isShowingAd) {
       console.log('Already showing an ad');
@@ -1020,7 +1035,6 @@ class AdsManager {
 
     // 3 = every time (no check needed)
 
-    // Priority: floor_inter > detail_inter
     let adToShow: InterstitialAd | null = null;
     let adType = '';
 
@@ -1042,13 +1056,11 @@ class AdsManager {
       await adToShow.show();
       trackAdShown(adType, screenName);
 
-      // Update cooldown
       this.recentAdShown = {
         screenName: screenName,
         timestamp: Date.now()
       };
 
-      // Save based on frequency
       if (frequency === 1) {
         await AsyncStorage.setItem(this.DETAIL_AD_SHOWN_KEY, 'true');
       }
@@ -1065,9 +1077,13 @@ class AdsManager {
     }
   }
 
-  // ==================== EVENT SCREEN ADS (Event, Challenge, Memo, Diary save/back button) ====================
   async showEventScreenInterstitialAd(screenName: string, actionType: 'save' | 'back'): Promise<boolean> {
     console.log(`Attempting Event Screen ${actionType} Ad for: ${screenName}`);
+
+    if (await this.isUserPremium()) {
+    console.log('User is Premium — skipping event screen ad');
+    return false;
+  }
 
     if (this.isShowingAd) {
       console.log('Already showing an ad');
@@ -1117,7 +1133,6 @@ class AdsManager {
 
     // 3 = every time (no check needed)
 
-    // Priority: floor_inter > event_inter
     let adToShow: InterstitialAd | null = null;
     let adType = '';
 
@@ -1139,13 +1154,11 @@ class AdsManager {
       await adToShow.show();
       trackAdShown(adType, screenName);
 
-      // Update cooldown
       this.recentAdShown = {
         screenName: screenName,
         timestamp: Date.now()
       };
 
-      // Save based on frequency
       if (frequency === 1) {
         await AsyncStorage.setItem(this.EVENT_AD_SHOWN_KEY, 'true');
       }
@@ -1163,7 +1176,12 @@ class AdsManager {
   }
 
   // ==================== BANNER AD CONFIG ====================
-  getBannerConfig(screen: 'main' | 'language' | 'setting' | 'event'): { show: boolean; id: string } | null {
+  async getBannerConfig(screen: 'main' | 'language' | 'setting' | 'event'): Promise<{ show: boolean; id: string } | null> {
+
+    if (await this.isUserPremium()) {
+    console.log(`User is Premium — skipping ${screen} banner`);
+    return null;
+  }
     const screenKey = `${screen}_screen` as keyof AdConfig;
     const screenConfig = this.config?.[screenKey];
 
@@ -1201,6 +1219,11 @@ class AdsManager {
 
   // ==================== INITIALIZATION ====================
   async initializeAds() {
+
+      if (await this.isUserPremium()) {
+    console.log('Premium user — skipping ad initialization entirely');
+    return;
+  }
     console.log('🚀 Initializing Ads...');
 
     const configLoaded = await this.loadConfigFromFirebase();
@@ -1226,6 +1249,11 @@ class AdsManager {
     this.loadRewardedAd();
   }
   async initializeAdsWithoutFloorInter() {
+
+    if (await this.isUserPremium()) {
+    console.log('Premium user — skipping ad initialization entirely');
+    return;
+  }
     console.log('🚀 Initializing Ads (WITHOUT floor_inter)...');
 
     const configLoaded = await this.loadConfigFromFirebase();

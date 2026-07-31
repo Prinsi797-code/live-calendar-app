@@ -116,9 +116,18 @@ export default function SearchScreen() {
     setIsListening(false);
   };
 
+  // useEffect(() => {
+  //   const config = AdsManager.getBannerConfig('home');
+  //   setBannerConfig(config);
+  // }, []);
+
   useEffect(() => {
-    const config = AdsManager.getBannerConfig('home');
-    setBannerConfig(config);
+    const loadBannerConfig = async () => {
+      const config = await AdsManager.getBannerConfig('main');
+      console.log('search screen banner config:', config);
+      setBannerConfig(config);
+    };
+    loadBannerConfig();
   }, []);
 
   useEffect(() => {
@@ -354,17 +363,17 @@ export default function SearchScreen() {
     inputRef.current?.clear();
   };
 
-useFocusEffect(
-  React.useCallback(() => {
-    // Screen pe aane par
-    return () => {
-      // Screen se jaane par — cleanup
-      stopVoiceSearch();
-      setSearchQuery('');
-      setIsListening(false);
-    };
-  }, [])
-);
+  useFocusEffect(
+    React.useCallback(() => {
+      // Screen pe aane par
+      return () => {
+        // Screen se jaane par — cleanup
+        stopVoiceSearch();
+        setSearchQuery('');
+        setIsListening(false);
+      };
+    }, [])
+  );
 
 
   const handleBackPress = async () => {
@@ -474,7 +483,7 @@ useFocusEffect(
               </TouchableOpacity>
             )}
           </View>
-{/* 
+          {/* 
           {searchQuery.length > 0 && (
             <TouchableOpacity
               style={styles.clearButton}

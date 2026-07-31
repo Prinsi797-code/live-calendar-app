@@ -38,10 +38,19 @@ export default function NotificationMore() {
     position: string;
   } | null>(null);
 
+  // useEffect(() => {
+  //   const config = AdsManager.getBannerConfig('setting');
+  //   console.log('Notification screen banner config:', config);
+  //   setBannerConfig(config);
+  // }, []);
+
   useEffect(() => {
-    const config = AdsManager.getBannerConfig('setting');
-    console.log('Notification screen banner config:', config);
-    setBannerConfig(config);
+    const loadBannerConfig = async () => {
+      const config = await AdsManager.getBannerConfig('setting');
+      console.log('Notification screen banner config:', config);
+      setBannerConfig(config);
+    };
+    loadBannerConfig();
   }, []);
 
   const handleBackPress = async () => {

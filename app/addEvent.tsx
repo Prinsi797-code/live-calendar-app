@@ -174,10 +174,15 @@ export default function AddEventScreen() {
     } | null>(null);
 
 
-    useEffect(() => {
-        const config = AdsManager.getBannerConfig('home');
-        setBannerConfig(config);
-    }, []);
+    useFocusEffect(
+        React.useCallback(() => {
+            const loadBannerConfig = async () => {
+                const config = await AdsManager.getBannerConfig('main');
+                setBannerConfig(config);
+            };
+            loadBannerConfig();
+        }, [])
+    );
 
     const isTimeInPast = (selectedDate: Date, selectedTime: Date) => {
         const now = new Date();

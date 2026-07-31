@@ -20,7 +20,7 @@ export default function ThemeMode() {
   useScreenTracking('theme_mode_screen');
 
   const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
-    setTheme(newTheme); 
+    setTheme(newTheme);
     const messages = {
       light: t("light_theme_appleid"),
       dark: t("dark_theme_appleid"),
@@ -35,9 +35,18 @@ export default function ThemeMode() {
     position: string;
   } | null>(null);
 
+  // useEffect(() => {
+  //   const config = AdsManager.getBannerConfig('setting');
+  //   setBannerConfig(config);
+  // }, []);
+
   useEffect(() => {
-    const config = AdsManager.getBannerConfig('setting');
-    setBannerConfig(config);
+    const loadBannerConfig = async () => {
+      const config = await AdsManager.getBannerConfig('setting');
+      console.log('theme mode screen banner config:', config);
+      setBannerConfig(config);
+    };
+    loadBannerConfig();
   }, []);
 
   const handleBackPress = async () => {
@@ -49,7 +58,7 @@ export default function ThemeMode() {
     }
   };
 
-  const isSystemSelected = theme === 'system'; 
+  const isSystemSelected = theme === 'system';
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
 

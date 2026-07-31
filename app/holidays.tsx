@@ -130,35 +130,44 @@ export default function Holidays() {
     loadCountries();
   }, []);
 
+  // useEffect(() => {
+  //   const config = AdsManager.getBannerConfig('search');
+  //   console.log('📋 Language screen banner config:', config);
+  //   setBannerConfig(config);
+  // }, []);
+
   useEffect(() => {
-    const config = AdsManager.getBannerConfig('search');
-    console.log('📋 Language screen banner config:', config);
-    setBannerConfig(config);
+    const loadBannerConfig = async () => {
+      const config = await AdsManager.getBannerConfig('setting');
+      console.log('holiday screen banner config:', config);
+      setBannerConfig(config);
+    };
+    loadBannerConfig();
   }, []);
+
 
   const handleBackPress = async () => {
     try {
-      console.log('Attempting to show language back ad...');
-      router.push({
+      const adShown = await AdsManager.showSettingScreenInterstitialAd('back');
+
+      const targetRoute = {
         pathname: '/',
         params: {
           refresh: Date.now().toString(),
           resetToToday: 'true'
         }
-      });
+      };
 
-      setTimeout(async () => {
-        await AdsManager.showSettingScreenInterstitialAd('back');
-      }, 100);
-
+      if (adShown) {
+        setTimeout(() => router.push(targetRoute), 100);
+      } else {
+        router.push(targetRoute);
+      }
     } catch (error) {
       console.error("Back ad error:", error);
       router.push({
         pathname: '/',
-        params: {
-          refresh: Date.now().toString(),
-          resetToToday: 'true'
-        }
+        params: { refresh: Date.now().toString(), resetToToday: 'true' }
       });
     }
   };
